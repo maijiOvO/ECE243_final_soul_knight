@@ -1,0 +1,34 @@
+# ==========================================
+# ECE 243 / Altera / Quartus / Nios V 专属屏蔽列表
+# ==========================================
+
+# 1. 编译生成的巨大二进制文件 (绝对不能传到 Git)
+*.sof
+*.pof
+*.elf
+*.amp
+*.a
+
+# 2. C语言/汇编编译过程中的中间文件
+*.o
+*.obj
+*.out
+
+# 3. Quartus 硬件工程产生的垃圾文件夹和报告文件 (极大且每次编译都变)
+db/
+incremental_db/
+output_files/
+simulation/
+timing/
+*.rpt
+*.summary
+*.jdi
+*.pin
+*.qws
+*.sld
+*.done
+*.qdf
+
+# 4. 操作系统产生的隐藏垃圾文件 (Mac 和 Windows)
+.DS_Store
+Thumbs.db
