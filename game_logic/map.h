@@ -38,4 +38,4 @@ int overlap(Rect a, Rect b);            //check if a nad b are overalap
 int can_move_to(int new_x, int new_y, int player_size);             //Checking if player can move the (new_x, new_y) location
 
 
-
+#endif      //MAP_Hw
