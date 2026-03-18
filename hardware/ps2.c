@@ -7,7 +7,7 @@ bool is_S_pressed = false;
 bool is_D_pressed = false;
 
 void ps2_init() {
-    // 键盘初始化（轮询模式下暂时不需要写寄存器）
+
 }
 
 void ps2_update_keys() {
