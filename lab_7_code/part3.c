@@ -1,4 +1,4 @@
-
+#include<stdint.h>
 #include<stdlib.h>
 #define Blue 0x001F
 #define Black 0
@@ -46,10 +46,8 @@ void swap(int *a, int *b) {
 void plot_pixel(int x, int y, short int line_color)
 {
     volatile short int *one_pixel_address;
-
-        one_pixel_address = pixel_buffer_start + (y << 10) + (x << 1);
-
-        *one_pixel_address = line_color;
+    one_pixel_address = (volatile short int *)(pixel_buffer_start + (y << 10) + (x << 1));
+    *one_pixel_address = line_color;
 }
 void draw_rec(int x, int y, int width, int height, int color){
     int half_w = width >> 1;
