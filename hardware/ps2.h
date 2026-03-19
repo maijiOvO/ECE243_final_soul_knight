@@ -1,15 +1,14 @@
 #ifndef PS2_H
 #define PS2_H
 
-#include <stdbool.h>
+// 暴露给外界的 4 个按键状态 (1=按下, 0=松开)
+extern int key_W;
+extern int key_A;
+extern int key_S;
+extern int key_D;
 
-// 暴露出四个按键的状态，供 main.c 或 player.c 读取
-extern bool is_W_pressed;
-extern bool is_A_pressed;
-extern bool is_S_pressed;
-extern bool is_D_pressed;
+// 初始化与更新函数
+void PS2_Init(void);
+void PS2_Update(void);
 
-void ps2_init();
-void ps2_update_keys();     // called before the start of new frames
-
-#endif // PS2_H
+#endif

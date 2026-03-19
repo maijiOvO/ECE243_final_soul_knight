@@ -29,7 +29,6 @@ extern Rect obstacle[MAX_OBS];          //
 extern int num_obstacles;               //It represent number of obstacles
 
 void init_obstacles(void);              //Generates obstacles
-void draw_rect(int x, int y, int w, int h, short int color);        //draw a rectangle on the screen
 void draw_border(void);                 //draw red border around the screen
 void draw_obstacles(void);              //draw all obstacles
 void draw_map(void);                    //draw the whole map

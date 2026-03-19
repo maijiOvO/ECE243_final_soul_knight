@@ -1,15 +1,7 @@
 #include"vga.h"
 #include"address_map.h"
 
-#define COLOR_MAGENTA_565  0xF81F 
-#define SCREEN_W 320
-#define SCREEN_H 240
 
-#define Blue 0x001F
-#define Black 0
-#define Red 0xF800
-#define Pink 0xF81F
-#define Green 0x07E0
 
 volatile int * pixel_ctrl_ptr = (volatile int *)0xFF203020;
 volatile int * pixel_status_ptr = (volatile int *)0xFF20302C;
@@ -85,24 +77,28 @@ void draw_line(int x0, int y0, int x1, int y1, int color) {
     }
 }
 
-void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height) 
-{
-    // 【核心秘诀】：把 8位的 char 指针，强制当成 16位的 short 指针来用
+void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
     uint16_t *pixels = (uint16_t *)img_data; 
     
-    for (int y = 0; y < height; y++) 
-    {
-        for (int x = 0; x < width; x++) 
-        {
-            // 从数组中读取当前像素的 16 位颜色
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
             uint16_t current_color = pixels[y * width + x];
-            
-            // 【抠图逻辑】：如果颜色不是洋红色，才把它画到屏幕上
-            if (current_color != COLOR_MAGENTA_565) 
-            {
+            if (current_color != COLOR_MAGENTA_565) {
                 plot_pixel(start_x + x, start_y + y, current_color);
             }
-            // 如果是洋红色，什么都不做，这就形成了透明！
+        }
+    }
+}
+
+void Draw_Transparent_Image_horizontal_flip(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
+    uint16_t *pixels = (uint16_t *)img_data; 
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint16_t current_color = pixels[y * width + x];
+            if (current_color != COLOR_MAGENTA_565) {
+                plot_pixel(start_x + width - 1 - x, start_y + y, current_color);
+            }
         }
     }
 }
@@ -115,10 +111,9 @@ void vga_wait_for_vsync(){
 }
 
 void vga_draw_rect(int x, int y, int width, int height, short color){
-    int half_w = width >> 1;
-    int half_h = height >> 1;
-    for(int i = (x - half_w); i <= (x + half_w); i++){
-        for(int j = (y - half_h); j <= (y + half_h); j++){
+
+    for(int i = x; i <= x + width; i++){
+        for(int j = y; j <= y + height; j++){
             int cur_x = i;
             int cur_y = j;
             if((cur_x >= 0) && (cur_x < 320) && (cur_y >= 0)&&(cur_y < 240)){

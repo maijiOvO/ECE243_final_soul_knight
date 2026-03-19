@@ -1303,3 +1303,7 @@ const unsigned char * const knight_anim[10] = {
     gImage_00, gImage_01, gImage_02, gImage_03, gImage_04,
     gImage_05, gImage_06, gImage_07, gImage_08, gImage_09
 };
+const unsigned char * const knight_idle[10] = {
+    gImage_00,gImage_00,gImage_00,gImage_00,gImage_00,
+    gImage_00,gImage_00,gImage_00,gImage_00,gImage_00
+};

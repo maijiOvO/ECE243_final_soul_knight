@@ -1,5 +1,6 @@
 #include "map.h"
 #include <stdlib.h>
+#include "../hardware/vga.h"
 
 Rect obstacles[MAX_OBS];
 int num_obstacles = 0;
@@ -14,24 +15,16 @@ int overlap(Rect a, Rect b){
     return 1;
 }
 
-void draw_rect(int x, int y, int w, int h, short int color){
-    for(int row = y; row < y + h; row ++){
-        for(int col = x; col < x + w; col ++){
-            plot_pixel(col, row, color);
-        }
-    }
-}
-
 void draw_border(void){
-    draw_rect(0, 0, SCREEN_W, BORDER_THICKNESS, RED);
-    draw_rect(0, SCREEN_H - BORDER_THICKNESS, SCREEN_W, BORDER_THICKNESS, RED);
-    draw_rect(0, 0, BORDER_THICKNESS, SCREEN_H, RED);
-    draw_rect(SCREEN_W - BORDER_THICKNESS, 0, BORDER_THICKNESS, SCREEN_H, RED);
+    vga_draw_rect(0, 0, SCREEN_W, BORDER_THICKNESS, RED);
+    vga_draw_rect(0, SCREEN_H - BORDER_THICKNESS, SCREEN_W, BORDER_THICKNESS, RED);
+    vga_draw_rect(0, 0, BORDER_THICKNESS, SCREEN_H, RED);
+    vga_draw_rect(SCREEN_W - BORDER_THICKNESS, 0, BORDER_THICKNESS, SCREEN_H, RED);
 }
 
 void draw_obstacles(void){
     for(int i = 0; i < num_obstacles; i++){
-        draw_rect(obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, RED);
+        vga_draw_rect(obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, RED);
     }
 }
 

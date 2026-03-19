@@ -1,7 +1,8 @@
 #include <stdint.h>
 //#include"weapon.h"
-//#include"map.h"
-//#include"../hardware/ps2.h"
+#include"map.h"
+#include"player.h"
+#include"../hardware/ps2.h"
 //#include"../hardware/timer.h"
 #include"../hardware/vga.h"
 #include"../sources/knight_anim.h"
@@ -18,7 +19,8 @@ short int Buffer0[240][512]; // 240 rows, 512 (320 + padding) columns
 short int Buffer1[240][512];
 int current_buffer = 0;         // can be 0 or 1 corresponding to current buffer
 
-
+int prev_knight_x[2] = {100, 100};
+int prev_knight_y[2] = {100, 100};
 
 int main(void){
 
@@ -33,28 +35,34 @@ int main(void){
     *(pixel_ctrl_ptr + 1) = (int) &Buffer1;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);
     clear_screen();                             // clean up two buffers, make sure all black
-    
-    int knight_w = 32;
-    int knight_h = 32;
-	
-	int knight_frame_count = 0;
-    int render_frame_count = 0;
-	while(1){
-		
-		vga_draw_rect(116, 116, 32, 32, 0xF81F);
-		
-		Draw_Transparent_Image(100, 100, knight_anim[knight_frame_count], knight_w, knight_h);
-        render_frame_count ++;
-        if(render_frame_count >5){
-            knight_frame_count ++ ;
-            render_frame_count = 0;
-        }
 
-		if(knight_frame_count > 9){knight_frame_count = 0;}
-            current_buffer = 1 - current_buffer;
+    Player knight_entity;
+    
+    Player_Init(&knight_entity, 160, 120);
+    PS2_Init();             // init the keys WASD to 0;
+    Player* knight = & knight_entity;
+
+	while(1){
+        PS2_Update();
+
+        int dx = 0, dy = 0;
+        if (key_W) dy -= 1;
+        if (key_S) dy += 1;
+        if (key_A) dx -= 1;
+        if (key_D) dx += 1;
+
+        Player_Update(knight, dx, dy);
+        vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
+
+        draw_map();
+
+        Player_Draw(knight);
+        prev_knight_x[current_buffer] = knight->x;
+        prev_knight_y[current_buffer] = knight->y;
 
         vga_wait_for_vsync(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+        current_buffer = 1 - current_buffer;
 	}
     return 0; 
 }
