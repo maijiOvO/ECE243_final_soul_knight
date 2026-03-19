@@ -1,5 +1,6 @@
 #include"vga.h"
-#include"address_map.h"
+
+#define COLOR_MAGENTA_565  0xF81F 
 
 volatile int * pixel_ctrl_ptr = (volatile int *)0xFF203020;
 volatile int * pixel_status_ptr = (volatile int *)0xFF20302C;
@@ -49,4 +50,26 @@ void vga_wait_for_vsync(){
     volatile int * pixel_status_ptr = (int *)0xFF20302C; // Status Register
     *pixel_ctrl_ptr = 1;
     while (*pixel_status_ptr & 0x01);
+}
+
+void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height) 
+{
+    // 【核心秘诀】：把 8位的 char 指针，强制当成 16位的 short 指针来用
+    uint16_t *pixels = (uint16_t *)img_data; 
+    
+    for (int y = 0; y < height; y++) 
+    {
+        for (int x = 0; x < width; x++) 
+        {
+            // 从数组中读取当前像素的 16 位颜色
+            uint16_t current_color = pixels[y * width + x];
+            
+            // 【抠图逻辑】：如果颜色不是洋红色，才把它画到屏幕上
+            if (current_color != COLOR_MAGENTA_565) 
+            {
+                plot_pixel(start_x + x, start_y + y, current_color);
+            }
+            // 如果是洋红色，什么都不做，这就形成了透明！
+        }
+    }
 }

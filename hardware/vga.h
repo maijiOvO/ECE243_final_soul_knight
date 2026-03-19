@@ -1,8 +1,11 @@
-// vga.h
+#include"address_map.h"
+#include"../sources/animation.c"
+
 #ifndef VGA_H
 #define VGA_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 // color def
 #define COLOR_BLACK  0x0000
