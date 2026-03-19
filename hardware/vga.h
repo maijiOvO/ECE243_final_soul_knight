@@ -1,24 +1,15 @@
-#include"address_map.h"
-#include"../sources/animation.c"
-
 #ifndef VGA_H
 #define VGA_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
-// color def
-#define COLOR_BLACK  0x0000
-#define COLOR_WHITE  0xFFFF
-#define COLOR_RED    0xF800
-#define COLOR_GREEN  0x07E0
-#define COLOR_BLUE   0x001F
-#define COLOR_YELLOW 0xFFE0
-
-void vga_init();
-void vga_draw_pixel(int x, int y, short color);
-void vga_clear_screen();
+//void vga_init();
+void plot_pixel(int x, int y, short int color);
+void clear_screen();
 void vga_draw_rect(int x, int y, int width, int height, short color);
 void vga_wait_for_vsync(); 
+void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height);
+extern volatile int pixel_buffer_start; 
 
 #endif
