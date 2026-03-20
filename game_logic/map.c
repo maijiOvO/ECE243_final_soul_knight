@@ -2,16 +2,59 @@
 #include <stdlib.h>
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
-#define min_space 16
 
 int current_inner_texture = 0;
+int max_rooms = 0;
 int walls[16][12] = {0};
-
-#define GRID_W 16
-#define GRID_H 12
-
 extern int walls[GRID_W][GRID_H];
 
+Room world_map[13][13];     //13 * 13 room space
+int init_x = 6;
+int init_y = 6;
+
+void init_world_map(){
+    for (int i = 0; i < 13; i ++){
+        for (int j = 0; j < 13; j ++){
+            world_map[i][j].exists = 0;
+        }
+    }
+    int rx = 6;
+    int ry = 6;
+    int count = 1;
+    max_rooms = rand()%2 +5;
+
+    // 确保起始房间默认是清空的，否则一出生就被怪围住
+    world_map[6][6].is_cleared = 1; 
+    world_map[rx][ry].exists = 1;
+
+    while(count < max_rooms) {
+        int dir = rand() % 4;
+        if(dir == 0) ry--;      // 上
+        else if(dir == 1) ry++; // 下
+        else if(dir == 2) rx--; // 左
+        else rx++; 
+
+        if(world_map[rx][ry].exists == 0) {
+            world_map[rx][ry].exists = 1;
+            world_map[rx][ry].is_cleared = 0;
+            count++;
+        }
+        else{continue;}
+    }
+}
+
+
+void draw_world_map(){
+    for(int i = 0; i < 13; i ++){
+        for(int j = 0; j < 13; j ++){
+            int cur_x = 20 * i;
+            int cur_y = 20 * j;
+            if(world_map[i][j].exists == 1){
+                Draw_Transparent_Image(cur_x, cur_y, wall_texture[3], 20, 20);
+            }
+        }
+    }
+}
 void init_walls() {
     // 1. 初始化清空数组 (确保每次重新生成都是一张白纸)
     for(int x = 0; x < GRID_W; x++) {

@@ -72,6 +72,7 @@ int main(void){
     srand(random_seed); 
 
     init_walls();
+    init_world_map();
     draw_walls();
 
 	while(1){
@@ -87,7 +88,7 @@ int main(void){
         vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
 
         draw_walls();
-        //draw_obstacles();
+        draw_world_map();
 
         Player_Draw(knight);
         prev_knight_x[current_buffer] = knight->x;
