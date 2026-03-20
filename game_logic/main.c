@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 //#include"weapon.h"
 #include"map.h"
 #include"player.h"
@@ -6,6 +7,7 @@
 //#include"../hardware/timer.h"
 #include"../hardware/vga.h"
 #include"../sources/knight_anim.h"
+
 
 // 1. 定义洋红色的 RGB565 值
 #define COLOR_MAGENTA_565  0xF81F  
@@ -31,16 +33,46 @@ int main(void){
     vga_wait_for_vsync();
     pixel_buffer_start = *pixel_ctrl_ptr;
     clear_screen();
+    Draw_Transparent_Image(0, 0, background_ptr, 320, 240);
+
+    *(pixel_ctrl_ptr + 1) = (int) &Buffer1;
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+    clear_screen();                            
+    Draw_Transparent_Image(0, 0, background_ptr, 320, 240);     //write the opening image to the buffers
+
+    Player knight_entity;
+    
+    Player_Init(&knight_entity, 144, 104);
+    PS2_Init();             // init the keys WASD to 0;
+    Player* knight = & knight_entity;
+
+    unsigned int random_seed = 0; // 种子计数器
+
+    // 这里其实可以画一行字："Press WASD to Start"
+    // 但就算不画，玩家进来肯定会习惯性按一下键盘
+
+    while (1) {
+        random_seed++; // 以 CPU 全速疯狂自增 (每秒几百万次)
+        
+        PS2_Update();
+        // 只要玩家按下了 W, A, S, D 中的任意一个键
+        if (key_W || key_A || key_S || key_D) {
+            break; // 瞬间打破循环！
+        }
+    }
+    vga_wait_for_vsync();
+    pixel_buffer_start = *pixel_ctrl_ptr;
+    clear_screen();
 
     *(pixel_ctrl_ptr + 1) = (int) &Buffer1;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);
     clear_screen();                             // clean up two buffers, make sure all black
 
-    Player knight_entity;
-    
-    Player_Init(&knight_entity, 160, 120);
-    PS2_Init();             // init the keys WASD to 0;
-    Player* knight = & knight_entity;
+    // 注入灵魂：用玩家反应时间这一瞬的数字，初始化随机数发生器！
+    srand(random_seed); 
+
+    init_walls();
+    draw_walls();
 
 	while(1){
         PS2_Update();
@@ -54,7 +86,8 @@ int main(void){
         Player_Update(knight, dx, dy);
         vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
 
-        draw_map();
+        draw_walls();
+        //draw_obstacles();
 
         Player_Draw(knight);
         prev_knight_x[current_buffer] = knight->x;

@@ -1,11 +1,12 @@
 #include "player.h"
 #include "../hardware/vga.h" // 需要用到画图函数
+#include "map.h"
 
 // 初始化玩家
 void Player_Init(Player *p, int start_x, int start_y) {
     p->x = start_x;
     p->y = start_y;
-    p->speed = 1;        // 每帧移动 3 个像素
+    p->speed = 3;        // 每帧移动 3 个像素
     p->dir = 0;
     p->height = 32;
     p->width = 32;
@@ -19,10 +20,24 @@ void Player_Init(Player *p, int start_x, int start_y) {
 
 // 玩家状态更新 (这个函数被 main 函数以严格的 60Hz 频率调用)
 void Player_Update(Player *p, int move_dx, int move_dy) {
-    // 1. 物理移动
-    p->x += move_dx * p->speed;
-    p->y += move_dy * p->speed;
 
+    int next_x = p->x + move_dx * p->speed;
+    int next_y = p->y + move_dy * p->speed;
+
+    // 分别检测 X 轴和 Y 轴 (实现丝滑贴墙滑动)
+    if (move_dx != 0) {
+        // 如果在 X 轴移动后，不会撞墙，才真正修改 p->x
+        if (can_move_to(next_x, p->y, p->width, p->height)) {
+            p->x = next_x;
+        }
+    }
+
+    if (move_dy != 0) {
+        // 如果在 Y 轴移动后，不会撞墙，才真正修改 p->y
+        if (can_move_to(p->x, next_y, p->width, p->height)) {
+            p->y = next_y;
+        }
+    }
     // 2. 记忆朝向 (假设 1 是右，2 是左)
     if (move_dx < 0) {
         p->dir = 2; // 面朝左
@@ -40,6 +55,9 @@ void Player_Update(Player *p, int move_dx, int move_dy) {
         p->is_moving = 0;
     }
 
+
+    // logic for character animations
+    //===================================
     // 4. 【动画状态切换逻辑】
     // 如果这一帧的状态和上一帧不一样 (也就是刚起步，或者刚刹车)
     if (was_moving != p->is_moving) {
@@ -49,7 +67,7 @@ void Player_Update(Player *p, int move_dx, int move_dy) {
 
     // 5. 【动画播放逻辑】(现在无论是跑还是停，都在播放动画！)
     p->anim_tick++;
-    
+
     if (p->is_moving) {
         // --- 正在跑动时的动画播放 ---
         p->anim_speed = 6; // 跑得快，每 6 个 VSync 切一张
