@@ -9,6 +9,7 @@ int walls[16][12] = {0};
 extern int walls[GRID_W][GRID_H];
 
 Room world_map[world_map_max][world_map_max];     //13 * 13 room space
+Room seed_map[world_map_max][world_map_max];
 int init_x = 6;
 int init_y = 6;
 int current_room_x = 6;
