@@ -72,6 +72,8 @@ int main(void){
     srand(random_seed); 
 
     init_world_map();
+    current_room_x = 6;
+    current_room_y = 6;
     init_walls();
     draw_walls();
 

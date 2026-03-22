@@ -21,6 +21,9 @@ void init_world_map(){
         }
     }
 
+    current_room_x = 6;
+    current_room_y = 6;
+
     int count = 1;
     max_rooms = rand()%2 +5;
 
@@ -42,13 +45,9 @@ void init_world_map(){
         }
         else{continue;}
     }
-    apply_doors_to_walls();
 }
 
-// map.c
-
-// 定义门的位置（假设是每条边的中间2个格子）
-void apply_doors_to_walls() {
+void apply_doors_to_walls() {       // the position of walls
     // 只有房间清空了才执行开门逻辑
     if (world_map[current_room_x][current_room_y].is_cleared == 0) {
         return; 
@@ -72,10 +71,7 @@ void apply_doors_to_walls() {
     }
 }
 
-// map.c
-
-// 这个函数返回 1 代表发生了跳转，0 代表没跳转
-int handle_room_transition(Player *p) {
+int handle_room_transition(Player *p) { // return 1 if jumped
     int teleported = 0;
 
     // 检测四个边缘
@@ -109,17 +105,7 @@ int handle_room_transition(Player *p) {
 }
 
 void draw_world_map() {
-    int min_i = 13, min_j = 13; // 初始设为最大值
-
-    // 1. 第一遍扫描：找到地图的“左上角边缘”
-    for (int i = 0; i < 13; i++) {
-        for (int j = 0; j < 13; j++) {
-            if (world_map[i][j].exists) {
-                if (i < min_i) min_i = i;
-                if (j < min_j) min_j = j;
-            }
-        }
-    }
+    int min_i = 4, min_j = 4; // 初始设为最大值
 
     // 2. 第二遍扫描：绘图
     int map_offset_x = 10; // 小地图距离屏幕左边的边距
@@ -127,7 +113,7 @@ void draw_world_map() {
     int room_size = 6;     // 每个小房间方块的大小
     int spacing = 8;      // 房间中心之间的间距 (留2像素空隙)
 
-    vga_draw_rect(0, 0, room_size * 7, room_size * 8, Grey);
+    //vga_draw_rect(0, 0, room_size * 7, room_size * 8, Grey);
 
     for (int i = 0; i < 13; i++) {
         for (int j = 0; j < 13; j++) {
@@ -224,6 +210,7 @@ void init_walls() {
     }
     apply_doors_to_walls();
 }
+
 void draw_walls(){
     for(int i = 0; i < GRID_W; i ++){
         for(int j = 0; j < GRID_H; j ++){

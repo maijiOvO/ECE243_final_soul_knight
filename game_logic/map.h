@@ -14,6 +14,8 @@
 #define GRID_H 12
 #define world_map_max 13
 #include"player.h"
+extern int current_room_x;
+extern int current_room_y;
 
 typedef struct {
     int exists;     // 0: 无房间, 1: 有房间
