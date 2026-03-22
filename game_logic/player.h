@@ -5,22 +5,19 @@
 #include "../sources/knight_anim.h" // 包含图片数据声明
 
 // 定义玩家结构体
-typedef struct {
-
-    int x;          // current position
+typedef struct Player {
+    int x;
     int y;
-    int speed;      // 移动速度
-    int dir;        // 0 = idle, i = left, 2 = right
+    int speed;
+    int dir;
     int height;
     int width;
 
-    // 2. 动画属性 (独立解耦计时)
-    int current_frame; // 当前播放到第几帧 (0~9)
-    int anim_tick;     // 内部计时器 (记录经历了几个 VSync)
-    int anim_speed;    // 动画阈值 (比如设为 6，代表 6 个 VSync 切一帧)
-    
-    // 3. 状态标记
-    int is_moving;     // 0: 静止, 1: 正在跑动
+    int current_frame;
+    int anim_tick;
+    int anim_speed;
+
+    int is_moving;
 } Player;
 
 // 声明对外接口

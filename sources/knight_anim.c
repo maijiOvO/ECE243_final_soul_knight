@@ -1867,4 +1867,5 @@ const unsigned char * const knight_idle[10] = {// replace later by idle animatio
 const unsigned char * const wall_texture[6] = {
     gImage_walls_0, gImage_walls_1, gImage_walls_2, gImage_walls_3, gImage_walls_4, gImage_walls_5
 };
+
 const unsigned char *background_ptr = background;
