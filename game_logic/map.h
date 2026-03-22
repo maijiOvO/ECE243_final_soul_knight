@@ -6,10 +6,14 @@
 
 #define BLACK 0x0000
 #define RED 0xF800
+#define Brown 0xa3c0
+#define Grey 0x5aeb
 
 #define min_space 16
 #define GRID_W 16
 #define GRID_H 12
+#define world_map_max 13
+#include"player.h"
 
 typedef struct {
     int exists;     // 0: 无房间, 1: 有房间
@@ -21,5 +25,7 @@ void draw_walls();
 void draw_world_map();
 void init_world_map();
 int can_move_to(int new_x, int new_y, int player_width, int player_height);            //Checking if player can move the (new_x, new_y) location
+int handle_room_transition(Player *p);
+void apply_doors_to_walls();
 
 #endif

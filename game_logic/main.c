@@ -71,8 +71,8 @@ int main(void){
     // 注入灵魂：用玩家反应时间这一瞬的数字，初始化随机数发生器！
     srand(random_seed); 
 
-    init_walls();
     init_world_map();
+    init_walls();
     draw_walls();
 
 	while(1){
@@ -85,6 +85,12 @@ int main(void){
         if (key_D) dx += 1;
 
         Player_Update(knight, dx, dy);
+        if (handle_room_transition(knight)) {
+            // 如果发生了传送，必须重置 prev 坐标
+            // 否则 vga_draw_rect 会去屏幕另一头擦除一个“幽灵残影”
+            prev_knight_x[0] = prev_knight_x[1] = knight->x;
+            prev_knight_y[0] = prev_knight_y[1] = knight->y;
+        }
         vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
 
         draw_walls();
