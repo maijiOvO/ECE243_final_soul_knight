@@ -20,8 +20,17 @@ extern int current_room_x;
 extern int current_room_y;
 
 typedef struct {
+    int num_clusters;
+    int current_inner_texture;
+    int shape[4];
+    int cx[4];
+    int cy[4];
+} RoomSeeds;
+
+typedef struct {
     int exists;
     int is_cleared;
+    RoomSeeds seeds;
 } Room;
 
 void init_walls();

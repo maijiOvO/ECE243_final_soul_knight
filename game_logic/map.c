@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
+#include "player.h"
 
 int current_inner_texture = 0;
 int max_rooms = 0;
@@ -34,15 +35,25 @@ void init_world_map(){
     int rx = 6, ry = 6;
     while(count < max_rooms) {
         int dir = rand() % 4;
-        if(dir == 0) ry--;      // 上
-        else if(dir == 1) ry++; // 下
-        else if(dir == 2) rx--; // 左
-        else rx++; 
+        if(dir == 0) ry--;      // up
+        else if(dir == 1) ry++; // down
+        else if(dir == 2) rx--; // left
+        else rx++;              // right
 
-        if(world_map[rx][ry].exists == 0) {
+        if (world_map[rx][ry].exists == 0) {
             world_map[rx][ry].exists = 1;
-            world_map[rx][ry].is_cleared = 1;   // so far, set all the rooms cleared before battle system developed
-            count++;
+        
+            RoomSeeds *s = &world_map[rx][ry].seeds;
+            s->num_clusters = rand() % 3 + 2;
+            s->current_inner_texture = rand() % 5;
+        
+            for (int i = 0; i < 4; i++) {
+                s->shape[i] = rand() % 5;
+                s->cx[i] = rand() % 3 + 2;
+                s->cy[i] = rand() % 4 + 3;
+            }
+        count++;
+        world_map[rx][ry].is_cleared = 1;
         }
         else{continue;}
     }
@@ -159,34 +170,29 @@ void init_walls() {
         walls[GRID_W - 1][i] = 1;  // 右边
     }
 
+    RoomSeeds *s = &world_map[current_room_x][current_room_y].seeds;
+    current_inner_texture = s->current_inner_texture; 
 
-    int num_clusters = rand() % 3 + 2; // 随机丢 2 到 4 个掩体堆
-    current_inner_texture = rand()%5;
+    for(int c = 0; c < s->num_clusters; c++) {
+        int shape = s->shape[c];
+        int cx = s->cx[c];
+        int cy = s->cy[c];
 
-    for(int c = 0; c < num_clusters; c++) {
-        int shape = rand() % 5;      // 随机抽取 5 种掩体形状之一
-        int cx = rand() % 3 + 2;     // 掩体的基准 X 坐标 (2, 3, 4)
-        int cy = rand() % 4 + 3;     // 掩体的基准 Y 坐标 (2~7)
-
+        // using the parameters in RoomSeeds
         if (shape == 0) { 
-            //1, 1*1
             walls[cx][cy] = 1;
         } 
         else if (shape == 1) { 
-            // 2, 2* 2
             walls[cx][cy] = 1;   walls[cx+1][cy] = 1;
             walls[cx][cy+1] = 1; walls[cx+1][cy+1] = 1;
         } 
         else if (shape == 2) { 
-            // 3, 3*1
             walls[cx][cy] = 1; walls[cx+1][cy] = 1; walls[cx+2][cy] = 1;
         } 
         else if (shape == 3) { 
-            // 4, 1*3
             walls[cx][cy] = 1; walls[cx][cy+1] = 1; walls[cx][cy+2] = 1;
         } 
         else if (shape == 4) { 
-            // 5, L
             walls[cx][cy] = 1; 
             walls[cx][cy+1] = 1; 
             walls[cx+1][cy+1] = 1;
@@ -194,12 +200,12 @@ void init_walls() {
     }
     // to make sure the edge areas are passable
     for(int i = 0; i < GRID_W; i++ ){
-        walls[i][2] = 0;           // 顶边
-        walls[i][GRID_H - 3] = 0;  // 底边
+        walls[i][2] = 0;
+        walls[i][GRID_H - 3] = 0;
     }
     for(int i = 0; i < GRID_H; i++ ){
-        walls[2][i] = 0;           // 左边
-        walls[GRID_W - 3][i] = 0;  // 右边
+        walls[2][i] = 0;
+        walls[GRID_W - 3][i] = 0;
     }
 
     //duplicate the left areas to the right
