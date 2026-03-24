@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
-//#include"weapon.h"
+#include"weapon.h"
 #include"map.h"
 #include"player.h"
 #include"../hardware/ps2.h"
@@ -24,6 +24,9 @@ int current_buffer = 0;         // can be 0 or 1 corresponding to current buffer
 int prev_knight_x[2] = {100, 100};
 int prev_knight_y[2] = {100, 100};
 
+int prev_mouse_x[2] = {160, 160};   // for erasing cursors
+int prev_mouse_y[2] = {120, 120};
+
 int main(void){
 
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
@@ -41,10 +44,13 @@ int main(void){
     Draw_Transparent_Image(0, 0, background_ptr, 320, 240);     //write the opening image to the buffers
 
     Player knight_entity;
+    Weapon gun_entity;
     
     Player_Init(&knight_entity, 144, 104);
+    Weapon_Init(&gun_entity, 0);
     PS2_Init();             // init the keys WASD to 0;
     Player* knight = & knight_entity;
+    Weapon* init_weapon = &gun_entity;
 
     unsigned int random_seed = 0; // 种子计数器
 
@@ -87,20 +93,34 @@ int main(void){
         if (key_D) dx += 1;
 
         Player_Update(knight, dx, dy);
-        if (handle_room_transition(knight)) {
-            // 如果发生了传送，必须重置 prev 坐标
-            // 否则 vga_draw_rect 会去屏幕另一头擦除一个“幽灵残影”
+        if (handle_room_transition(knight)) {               // reset the prev array after teleproting
             prev_knight_x[0] = prev_knight_x[1] = knight->x;
             prev_knight_y[0] = prev_knight_y[1] = knight->y;
-        }
-        vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
+        } 
+        
+        // the numbers means the offset due to ewapons, need to clear a greater area
+        vga_draw_rect(prev_knight_x[current_buffer] - 5, prev_knight_y[current_buffer] - 5, knight->width + 10, knight->height + 10, Black);
+        vga_draw_rect(prev_mouse_x[current_buffer], prev_mouse_y[current_buffer], 5, 5, Black); // erase old cursor
+        Bullet_Erase(init_weapon, current_buffer);                                              // erase old bullet
+
+        Weapon_Update(init_weapon, knight, &mouse);
 
         draw_walls();
         draw_world_map();
 
         Player_Draw(knight);
+        Weapon_Draw(init_weapon, knight);
+        Bullet_Draw(init_weapon, current_buffer);
+
+        vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);// draw the cursor
+        vga_draw_rect(mouse.x + 2, mouse.y, 1, 5, Green);// draw the cursor
+
+        // update prev corrds
         prev_knight_x[current_buffer] = knight->x;
         prev_knight_y[current_buffer] = knight->y;
+
+        prev_mouse_x[current_buffer] = mouse.x;
+        prev_mouse_y[current_buffer] = mouse.y;
 
         vga_wait_for_vsync(); // swap front and back buffers on VGA vertical sync
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer

@@ -17,6 +17,7 @@ extern const unsigned char gImage_09[];
 extern const unsigned char * const knight_anim[];
 extern const unsigned char * const knight_idle[];
 extern const unsigned char * const wall_texture[];
-extern const unsigned char *background_ptr;
+extern const unsigned char * background_ptr;
+extern const unsigned char * const weapons[];
 
 #endif
