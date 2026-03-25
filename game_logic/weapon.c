@@ -65,7 +65,7 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
 // 初始化武器属性
 void Weapon_Init(Weapon *w, int id) {
     w->id = id;
-    w->fire_rate = 15;      // 默认每 0.25 秒一发 (60fps/15)
+    w->fire_rate = 10;      // 默认每 0.25 秒一发 (60fps/15)
     w->damage = 3;
     w->is_laser = false;
     w->is_bouncy = false;
