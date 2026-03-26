@@ -40,5 +40,6 @@ void init_world_map();
 int can_move_to(int new_x, int new_y, int player_width, int player_height);
 int handle_room_transition(Player *p);
 void apply_doors_to_walls();
+void draw_portals();
 
 #endif

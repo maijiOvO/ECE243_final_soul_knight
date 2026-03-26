@@ -3,7 +3,23 @@
 #include "../sources/knight_anim.h" // 确保能访问到 weapons 数组
 #include "map.h" // 需要调用 can_move_to
 #include "../hardware/ps2.h"
+#include "../sources/weapon_texture.h"
 #include "player.h"
+#include <math.h> // 仅用于 atan2f 决定武器贴图
+
+//  quick sqrt
+uint32_t isqrt(uint32_t n) {
+    uint32_t root = 0, bit = 1 << 30;
+    while (bit > n) bit >>= 2;
+    while (bit != 0) {
+        if (n >= root + bit) {
+            n -= root + bit;
+            root = (root >> 1) + bit;
+        } else root >>= 1;
+        bit >>= 2;
+    }
+    return root;
+}
 
 void Bullet_Erase(Weapon *w, int buffer_id) {
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -17,47 +33,54 @@ void Bullet_Erase(Weapon *w, int buffer_id) {
     }
 }
 void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
-    // 1. 处理射击冷却
-    if (w->cooldown_timer > 0) w->cooldown_timer--;
+    // 1. 视觉效果：决定武器贴图索引 (每帧执行一次 atan2f 性能开销极小)
+    int dx = m->x - (p->x + 16);
+    int dy = m->y - (p->y + 16);
+    float angle = atan2f((float)dy, (float)dx);
+    if (angle < 0) angle += 6.283185f; // 2*PI
+    w->current_dir_index = (int)((angle / 6.283185f) * 16.0f + 0.5f) % 16;
 
-    // 2. 尝试发射子弹 (玩家按下左键且冷却完毕)
+    // 2. 射击逻辑：高精度向量计算
+    if (w->cooldown_timer > 0) w->cooldown_timer--;
+    
     if (m->left_click && w->cooldown_timer == 0) {
         for (int i = 0; i < MAX_BULLETS; i++) {
             if (!w->bullets[i].active) {
-                w->bullets[i].active = true;
-                if(p->dir == 2){
-                    w->bullets[i].x = p->x + 0; // 从角色中心发射
-                    w->bullets[i].y = p->y + 12;
-                    w->bullets[i].vx = -w->bullet_speed;
-                    w->bullets[i].vy = 0;
-                }
-                else{
-                    w->bullets[i].x = p->x + 32; // 从角色中心发射
-                    w->bullets[i].y = p->y + 12;
-                    w->bullets[i].vx = w->bullet_speed;
-                    w->bullets[i].vy = 0;
-                }
+                // 计算距离 L
+                uint32_t dist_sq = dx*dx + dy*dy;
+                if (dist_sq == 0) dist_sq = 1;
+                uint32_t L = isqrt(dist_sq);
 
+                // 发射子弹：Vx = (speed * dx * 256) / L
+                w->bullets[i].active = true;
+                w->bullets[i].vx_fp = (w->bullet_speed * dx << FP_SHIFT) / (int)L;
+                w->bullets[i].vy_fp = (w->bullet_speed * dy << FP_SHIFT) / (int)L;
+                
+                // 初始位置设定 (玩家中心)
+                w->bullets[i].x_fp = (p->x + 16) << FP_SHIFT;
+                w->bullets[i].y_fp = (p->y + 16) << FP_SHIFT;
+                
                 w->cooldown_timer = w->fire_rate;
                 break;
             }
         }
     }
 
-    // 3. 更新所有子弹位置
+    // 3. 子弹物理更新：纯整数运算
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (w->bullets[i].active) {
-            int nx = w->bullets[i].x + w->bullets[i].vx;
-            int ny = w->bullets[i].y + w->bullets[i].vy;
+            w->bullets[i].x_fp += w->bullets[i].vx_fp;
+            w->bullets[i].y_fp += w->bullets[i].vy_fp;
 
-            // 撞墙检测：子弹通常比玩家小，这里假设 4x4
-            if (can_move_to(nx, ny, 4, 4)) {
-                w->bullets[i].x = nx;
-                w->bullets[i].y = ny;
-                // 飞出屏幕检测
-                if (nx < 0 || nx > 320 || ny < 0 || ny > 240) w->bullets[i].active = false;
+            int real_x = w->bullets[i].x_fp >> FP_SHIFT;
+            int real_y = w->bullets[i].y_fp >> FP_SHIFT;
+
+            // 碰撞检测与边界检查
+            if (can_move_to(real_x, real_y, 4, 4) && 
+                real_x > 0 && real_x < 320 && real_y > 0 && real_y < 240) {
+                // 正常飞行，无需额外动作
             } else {
-                w->bullets[i].active = false; // 撞墙消失
+                w->bullets[i].active = false; // 撞墙或出界消失
             }
         }
     }
@@ -79,41 +102,37 @@ void Weapon_Init(Weapon *w, int id) {
 }
 // 绘制武器
 void Weapon_Draw(Weapon *w, Player *p) {
-    // 设置武器相对于玩家坐标中心的偏移
-    // 这里的数字需要根据你的贴图实际效果微调
-    int offset_x = 4; 
-    int offset_y = 0; 
+    // 1. 获取鼠标相对于玩家中心的偏移量，判断在左还是在右
+    // 注意：这里的 mouse 是 ps2.h 里的全局变量
+    int dx = mouse.x - (p->x + 16); 
 
-    if (p->dir == 2) {
-        // 玩家面朝左 (dir == 2)
-        // 武器也要翻转，并出现在玩家坐标的左侧
-        Draw_Transparent_Image_horizontal_flip(
-            p->x - offset_x, 
-            p->y + offset_y, 
-            weapons[w->id], 
-            w->width, 
-            w->height
-        );
-    } else {
-        // 默认/面朝右 (dir == 1)
-        Draw_Transparent_Image(
-            p->x + offset_x, 
-            p->y + offset_y, 
-            weapons[w->id], 
-            w->width, 
-            w->height
-        );
+    if (dx < 0) {
+        // --- 情况 A：鼠标在左侧 ---
+        // 1. 计算右侧对应的镜像贴图索引
+        int mirrored_index = (8 - w->current_dir_index + 16) % 16;
+        
+        // 2. 调用水平翻转函数
+        // 注意：如果你发现位置有轻微偏移，可以在 p->x 基础上加减 1-2 像素微调
+        Draw_Transparent_Image_horizontal_flip(p->x, p->y, rotated_weapons[mirrored_index], 32, 32);
+    } 
+    else {
+        // --- 情况 B：鼠标在右侧 ---
+        // 直接按当前索引正常绘制
+        Draw_Transparent_Image(p->x, p->y, rotated_weapons[w->current_dir_index], 32, 32);
     }
 }
 void Bullet_Draw(Weapon *w, int buffer_id) {
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (w->bullets[i].active) {
-            // 画出当前位置的黄色子弹
-            vga_draw_rect(w->bullets[i].x, w->bullets[i].y, 6, 3, 0xFFE0);
+            int rx = w->bullets[i].x_fp >> FP_SHIFT;
+            int ry = w->bullets[i].y_fp >> FP_SHIFT;
             
-            // 【重要】：立即记录在这个 Buffer 上的位置，供下次循环回到此 Buffer 时擦除
-            w->bullets[i].prev_x[buffer_id] = w->bullets[i].x;
-            w->bullets[i].prev_y[buffer_id] = w->bullets[i].y;
+            // 画出黄色 3x3 子弹
+            vga_draw_rect(rx, ry, 3, 3, 0xFFE0);
+            
+            // 记录当前坐标供双缓冲擦除使用
+            w->bullets[i].prev_x[buffer_id] = rx;
+            w->bullets[i].prev_y[buffer_id] = ry;
         }
     }
 }

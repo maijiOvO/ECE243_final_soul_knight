@@ -1,97 +1,74 @@
 #include <stdint.h>
 #include <stdlib.h>
-#include"weapon.h"
-#include"map.h"
-#include"player.h"
-#include"../hardware/ps2.h"
-//#include"../hardware/timer.h"
-#include"../hardware/vga.h"
-#include"../sources/knight_anim.h"
-
+#include "weapon.h"
 #include "map.h"
 #include "player.h"
-#include "enemy.h"             // 引入幽灵
 #include "../hardware/ps2.h"
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
+#include "../sources/map_texture.h"
 
-#define ENEMY_COUNT 8  // ✨ 新增：定义怪物数量为 8
-Enemy ghosts[ENEMY_COUNT]; // ✨ 新增：创建 8 只幽灵
+// 颜色定义
+#define COLOR_MAGENTA_565  0xF81F 
 
-#define COLOR_MAGENTA_565  0xF81F  
-
-// 假设你的屏幕分辨率是 320x240
-short int Buffer0[240][512]; // 240 rows, 512 (320 + padding) columns
+// 显存缓冲区
+short int Buffer0[240][512]; 
 short int Buffer1[240][512];
-int current_buffer = 0;         // can be 0 or 1 corresponding to current buffer
+int current_buffer = 0;
 
+// 历史位置记录（用于局部擦除或逻辑同步）
 int prev_knight_x[2] = {100, 100};
 int prev_knight_y[2] = {100, 100};
-
-int prev_mouse_x[2] = {160, 160};   // for erasing cursors
+int prev_mouse_x[2] = {160, 160};
 int prev_mouse_y[2] = {120, 120};
 
-int main(void){
-
+int main(void) {
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 
-    // 1. 设置双缓冲并初次清屏
+    // 1. 硬件初始化：设置双缓冲并初次清屏
     *(pixel_ctrl_ptr + 1) = (int) &Buffer0;
     vga_wait_for_vsync();
     pixel_buffer_start = *pixel_ctrl_ptr;
     clear_screen();
-    Draw_Transparent_Image(0, 0, background_ptr, 320, 240);
+    // 如果有背景图，在此绘制
+    if(background_ptr) Draw_Opaque_Image(0, 0, background_ptr, 320, 240);
 
     *(pixel_ctrl_ptr + 1) = (int) &Buffer1;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);
     clear_screen();                            
-    Draw_Transparent_Image(0, 0, background_ptr, 320, 240);     // 写入开机画面
+    if(background_ptr) Draw_Opaque_Image(0, 0, background_ptr, 320, 240);
 
-    // 2. 初始化实体
+    // 2. 初始化玩家与武器实体
     Player knight_entity;
     Weapon gun_entity;
     
     Player_Init(&knight_entity, 144, 104);
     Weapon_Init(&gun_entity, 0);
-    PS2_Init();             // init the keys WASD to 0;
-    Player* knight = & knight_entity;
+    PS2_Init();
+    
+    Player* knight = &knight_entity;
     Weapon* init_weapon = &gun_entity;
 
-    Enemy ghost;            // ✨ 定义幽灵
-
-    unsigned int random_seed = 0; // 种子计数器
-
-    // 🚦 菜单等待画面：全速自增随机种子
+    // 3. 随机种子获取流程
+    unsigned int random_seed = 0; 
     while (1) {
         random_seed++; 
         PS2_Update();
         if (key_W || key_A || key_S || key_D) {
-            break; // 玩家按下 WASD，开始游戏
+            break; 
         }
     }
-
-    vga_wait_for_vsync();
-    pixel_buffer_start = *pixel_ctrl_ptr;
-    clear_screen();
-
-    *(pixel_ctrl_ptr + 1) = (int) &Buffer1;
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    clear_screen(); // 双缓冲全黑清屏
-
-    // 🎲 注入灵魂：随机数发生器
     srand(random_seed); 
 
+    // 4. 地图初始化
     init_world_map();
     current_room_x = 6;
     current_room_y = 6;
     init_walls();
-    draw_walls();
 
-    // 👻 召唤第一只幽灵
-    Enemy_Init_Random(&ghost);
-    
-// 🎮 游戏正式主循环
-    while(1){
+    //游戏正式主循环
+    while(1) {
+        // [A] 读取输入
         PS2_Update();
 
         int dx = 0, dy = 0;
@@ -100,81 +77,46 @@ int main(void){
         if (key_A) dx -= 1;
         if (key_D) dx += 1;
 
+        // [B] 逻辑更新
         Player_Update(knight, dx, dy);
-        
-        // the numbers means the offset due to ewapons, need to clear a greater area
-        vga_draw_rect(prev_knight_x[current_buffer] - 5, prev_knight_y[current_buffer] - 5, knight->width + 10, knight->height + 10, Black);
-        vga_draw_rect(prev_mouse_x[current_buffer], prev_mouse_y[current_buffer], 5, 5, Black); // erase old cursor
-        Bullet_Erase(init_weapon, current_buffer);                                              // erase old bullet
-
         Weapon_Update(init_weapon, knight, &mouse);
 
-        // --- 🤖 1. 更新所有幽灵 ---
-        for (int i = 0; i < ENEMY_COUNT; i++) {
-            Enemy_Update(&ghosts[i]); 
-        }
-
-        // 🚪 地图切换房间逻辑
+        // [C] 房间切换处理
         if (handle_room_transition(knight)) {
+            // 切换房间后，强制同步两个Buffer的历史坐标，防止擦除错误
             prev_knight_x[0] = prev_knight_x[1] = knight->x;
             prev_knight_y[0] = prev_knight_y[1] = knight->y;
-
-            // ✨【关键判断】：假设我们只让地图坐标为 (6, 7) 的房间刷鬼
-            // 你可以改成任意你喜欢的房间组合，或者随机决定
-            if (current_room_x == 6 && current_room_y == 7) {
-                for (int i = 0; i < ENEMY_COUNT; i++) {
-                    Enemy_Init_Random(&ghosts[i]); // 在这个房间刷出 8 只鬼
-                }
-            } else {
-                // 如果不是这个房间，把所有的鬼“杀掉”（alive = 0），它们就不会显示和移动了
-                for (int i = 0; i < ENEMY_COUNT; i++) {
-                    ghosts[i].alive = 0; 
-                }
-            }
+            prev_mouse_x[0] = prev_mouse_x[1] = mouse.x;
+            prev_mouse_y[0] = prev_mouse_y[1] = mouse.y;
         }
 
-        // 🪠 2. 擦除上一帧旧图像（骑士和 8 只幽灵）
-        vga_draw_rect(prev_knight_x[current_buffer], prev_knight_y[current_buffer], knight->width, knight->height, Black);
-        
-        for (int i = 0; i < ENEMY_COUNT; i++) {
-            // 只要它上一帧活着，或者现在还活着，就得擦除它在当前 buffer 留下的残影
-            vga_draw_rect(ghosts[i].prev_x[current_buffer], ghosts[i].prev_y[current_buffer], ghosts[i].width, ghosts[i].height, Black);
-        }
+        // [D] 渲染准备：清屏
+        // 注意：性能建议——如果 draw_walls 覆盖全图，不需要 clear_screen
+        // 但由于你有黑色背景，clear_screen() 是最稳妥的防残影方法
+        Draw_Opaque_Image(0, 0, dungeon, 320, 240);
 
-        // 🧱 3. 渲染地图
+        // [E] 绘制世界
         draw_walls();
+        draw_portals();
         draw_world_map();
 
-        // 🎨 4. 渲染实体（骑士和 8 只幽灵）
+        // [F] 绘制实体
         Player_Draw(knight);
         Weapon_Draw(init_weapon, knight);
         Bullet_Draw(init_weapon, current_buffer);
 
-        vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);// draw the cursor
-        vga_draw_rect(mouse.x + 2, mouse.y, 1, 5, Green);// draw the cursor
+        // 绘制准星 (绿色十字)
+        vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
+        vga_draw_rect(mouse.x + 2, mouse.y, 1, 5, Green);
 
-        // update prev corrds
-        
-        for (int i = 0; i < ENEMY_COUNT; i++) {
-            if (ghosts[i].alive) {
-                Enemy_Draw(&ghosts[i]); // 只画活着的鬼
-            }
-        }
-
-        // 📝 5. 记录当前位置，留给下一帧在当前 buffer 擦除
+        // [G] 记录当前位置，留给下一帧擦除（如果不用全屏清屏的话）
         prev_knight_x[current_buffer] = knight->x;
         prev_knight_y[current_buffer] = knight->y;
-        
-        for (int i = 0; i < ENEMY_COUNT; i++) {
-            ghosts[i].prev_x[current_buffer] = ghosts[i].x;
-            ghosts[i].prev_y[current_buffer] = ghosts[i].y;
-        }
-
         prev_mouse_x[current_buffer] = mouse.x;
         prev_mouse_y[current_buffer] = mouse.y;
 
-        vga_wait_for_vsync(); // swap front and back buffers on VGA vertical sync
-        pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+        // [H] 硬件同步与缓冲区翻转
+        vga_wait_for_vsync(); 
         pixel_buffer_start = *(pixel_ctrl_ptr + 1); 
         current_buffer = 1 - current_buffer;
     }

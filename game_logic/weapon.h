@@ -5,15 +5,22 @@
 #include <stdbool.h>
 #include "player.h"
 #include "../hardware/ps2.h"
+#include <math.h>
 
-#define MAX_BULLETS 10
+#define MAX_BULLETS 15
+#define PI 3.14159265f
 
-// bullet struct def
+#define MAX_BULLETS 15
+#define FP_SHIFT 8    // 定点数放大倍数 (2^8 = 256)
+
 typedef struct {
-    int x, y;
-    int vx, vy;
+    int x_fp;         // X坐标 * 256
+    int y_fp;         // Y坐标 * 256
+    int vx_fp;        // X速度 * 256
+    int vy_fp;        // Y速度 * 256
     bool active;
-    int prev_x[2]; 
+    // prev用于双缓冲擦除
+    int prev_x[2];    
     int prev_y[2];
 } Bullet;
 
@@ -31,6 +38,7 @@ typedef struct {
     int cooldown_timer;     // 内部冷却计时器
     int width;              // 武器贴图宽度
     int height;             // 武器贴图高度
+    int current_dir_index;  // 当前旋转角度索引
     Bullet bullets[MAX_BULLETS];
 } Weapon;
 

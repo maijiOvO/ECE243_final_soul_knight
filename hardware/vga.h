@@ -19,8 +19,11 @@ void plot_pixel(int x, int y, short int color);
 void clear_screen();
 void vga_draw_rect(int x, int y, int width, int height, short color);
 void vga_wait_for_vsync(); 
+void Draw_Opaque_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height);
 void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height);
 void Draw_Transparent_Image_horizontal_flip(int start_x, int start_y, const unsigned char *img_data, int width, int height);
+void Draw_Transparent_Image_CW90(int start_x, int start_y, const unsigned char *img_data, int width, int height);
+void Draw_Transparent_Image_CCW90(int start_x, int start_y, const unsigned char *img_data, int width, int height);
 extern volatile int pixel_buffer_start; 
 
 #endif

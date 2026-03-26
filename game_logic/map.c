@@ -2,8 +2,12 @@
 #include <stdlib.h>
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
+#include "../sources/map_texture.h"
 #include "player.h"
+#define PORTAL_ANIM_SPEED 6
 
+int portal_frame = 0;
+int portal_tick = 0;
 int current_inner_texture = 0;
 int max_rooms = 0;
 int walls[16][12] = {0};
@@ -219,18 +223,59 @@ void init_walls() {
 }
 
 void draw_walls(){
-    for(int i = 0; i < GRID_W; i ++){
-        for(int j = 0; j < GRID_H; j ++){
+    for(int i = 1; i < GRID_W - 1; i ++){
+        for(int j = 1; j < GRID_H - 1; j ++){
             int cur_x = 20 * i;
             int cur_y = 20 * j;
-            if(i == 0 || i == GRID_W - 1 || j == 0 || j == GRID_H - 1){
-                Draw_Transparent_Image(cur_x, cur_y, wall_texture[5], 20, 20);
+            if(walls[i][j] == 1){
+                if(current_inner_texture == 3){Draw_Transparent_Image(cur_x, cur_y, wall_texture[current_inner_texture], 20, 20);}
+                else{Draw_Opaque_Image(cur_x, cur_y, wall_texture[current_inner_texture], 20, 20);}
             }
-            else if(walls[i][j] == 1){
-                Draw_Transparent_Image(cur_x, cur_y, wall_texture[current_inner_texture], 20, 20);
-            }
-            if(walls[i][j] == 2){
-                vga_draw_rect(cur_x, cur_y, 20, 20, Black);
+        }
+    }
+}
+
+void draw_portals() {
+    // 1. 更新动画帧索引
+    portal_tick++;
+    if (portal_tick >= PORTAL_ANIM_SPEED) {
+        portal_frame = (portal_frame + 1) % 8;
+        portal_tick = 0;
+    }
+
+    const unsigned char* current_portal_img = portal[portal_frame];
+
+    for (int i = 0; i < GRID_W; i++) {
+        for (int j = 0; j < GRID_H; j++) {
+            if (walls[i][j] == 2) {
+                int cur_x = 20 * i;
+                int cur_y = 20 * j;
+
+                // --- 情况 A：顶部门 (walls[7][0], walls[8][0]) ---
+                // 我们只在 i=7 的时候画，一次性覆盖 7和8 两个格子
+                if (j == 0 && i == 7) {
+                    // 原始 20x40 顺时针转 90 度变成 40x20
+                    Draw_Transparent_Image_CCW90(cur_x, cur_y, current_portal_img, 20, 40);
+                }
+
+                // --- 情况 B：底部门 (walls[7][11], walls[8][11]) ---
+                else if (j == GRID_H - 1 && i == 7) {
+                    // 同样旋转 90 度
+                    Draw_Transparent_Image_CW90(cur_x, cur_y, current_portal_img, 20, 40);
+                }
+
+                // --- 情况 C：左侧门 (walls[0][5], walls[0][6]) ---
+                // 我们只在 j=5 的时候画，一次性向下覆盖 5和6 两个格子
+                else if (i == 0 && j == 5) {
+                    // 垂直方向，无需旋转，直接画
+                    Draw_Transparent_Image_horizontal_flip(cur_x, cur_y, current_portal_img, 20, 40);
+                }
+
+                // --- 情况 D：右侧门 (walls[15][5], walls[15][6]) ---
+                else if (i == GRID_W - 1 && j == 5) {
+                    // 垂直方向，直接画
+                    Draw_Transparent_Image(cur_x, cur_y, current_portal_img, 20, 40);
+                }
             }
         }
     }

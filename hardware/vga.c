@@ -77,6 +77,18 @@ void draw_line(int x0, int y0, int x1, int y1, int color) {
     }
 }
 
+// 专门用于画墙、地板等不透明物体
+void Draw_Opaque_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
+    uint16_t *pixels = (uint16_t *)img_data;
+    for (int y = 0; y < height; y++) {
+        // 直接定位到该行的起始显存地址
+        volatile uint16_t *dest = (uint16_t *)(pixel_buffer_start + ((start_y + y) << 10) + (start_x << 1));
+        for (int x = 0; x < width; x++) {
+            *dest++ = pixels[y * width + x]; // 无须判断，直接覆盖
+        }
+    }
+}
+
 void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
     uint16_t *pixels = (uint16_t *)img_data; 
     
@@ -98,6 +110,42 @@ void Draw_Transparent_Image_horizontal_flip(int start_x, int start_y, const unsi
             uint16_t current_color = pixels[y * width + x];
             if (current_color != COLOR_MAGENTA_565) {
                 plot_pixel(start_x + width - 1 - x, start_y + y, current_color);
+            }
+        }
+    }
+}
+
+
+void Draw_Transparent_Image_CW90(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
+    uint16_t *pixels = (uint16_t *)img_data;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint16_t current_color = pixels[y * width + x];
+            
+            // 只有非背景色才绘制
+            if (current_color != 0xF81F) {
+                // 坐标映射：新的 X 是由 Y 决定的，新的 Y 是由 X 决定的
+                int new_x = start_x + (height - 1 - y);
+                int new_y = start_y + x;
+                plot_pixel(new_x, new_y, current_color);
+            }
+        }
+    }
+}
+
+void Draw_Transparent_Image_CCW90(int start_x, int start_y, const unsigned char *img_data, int width, int height) {
+    uint16_t *pixels = (uint16_t *)img_data;
+    
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            uint16_t current_color = pixels[y * width + x];
+            
+            if (current_color != 0xF81F) {
+                // 坐标映射
+                int new_x = start_x + y;
+                int new_y = start_y + (width - 1 - x);
+                plot_pixel(new_x, new_y, current_color);
             }
         }
     }
