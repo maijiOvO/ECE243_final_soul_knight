@@ -170,3 +170,34 @@ void vga_draw_rect(int x, int y, int width, int height, short color){
         }
     }
 }
+
+void vga_draw_health_bar(int x, int y, int current_hp, int max_hp, int bar_width, int bar_height) {
+    // 1. 绘制边框 (灰色)
+    // 边框比实际血条大 2 像素
+    vga_draw_rect(x - 1, y - 1, bar_width + 2, bar_height + 2, 0x8410); // Gray color
+
+    // 2. 绘制血条背景 (深红色，模拟血条流失后的底色)
+    vga_draw_rect(x, y, bar_width, bar_height, 0x8000); // Dark Red
+
+    // 3. 计算绿色血条的长度 (避免浮点数，使用整数乘除)
+    int green_bar_length = (current_hp * bar_width) / max_hp;
+    
+    // 确保长度不会超过总宽度或小于 0
+    if (green_bar_length < 0) green_bar_length = 0;
+    if (green_bar_length > bar_width) green_bar_length = bar_width;
+
+    // 4. 绘制绿色血条 (左侧填充)
+    if (green_bar_length > 0) { // 只有有血才画
+        int hp_percent = (current_hp * 100) / max_hp ;
+        if(hp_percent > 50){
+            vga_draw_rect(x, y, green_bar_length, bar_height, 0x07E0); // Bright Green
+        }
+        else if(hp_percent > 25 && hp_percent <= 50){
+            vga_draw_rect(x, y, green_bar_length, bar_height, 0xff2c);  // yellow
+        }
+        else if(hp_percent <= 25){
+            vga_draw_rect(x, y, green_bar_length, bar_height, 0xf800);  // red
+        }
+
+    }
+}

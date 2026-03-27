@@ -109,11 +109,20 @@ int main(void) {
         vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
         vga_draw_rect(mouse.x + 2, mouse.y, 1, 5, Green);
 
+        int bar_width = 30;
+        int bar_height = 4;
+        int bar_x = knight->x + (knight->width - bar_width) / 2; // 居中
+        int bar_y = knight->y - bar_height - 4;                  // 头顶上方留 4 像素间隙
+        
+        vga_draw_health_bar(bar_x, bar_y, knight->current_hp, knight->max_hp, bar_width, bar_height);
+
         // [G] 记录当前位置，留给下一帧擦除（如果不用全屏清屏的话）
         prev_knight_x[current_buffer] = knight->x;
         prev_knight_y[current_buffer] = knight->y;
         prev_mouse_x[current_buffer] = mouse.x;
         prev_mouse_y[current_buffer] = mouse.y;
+
+        if(knight -> current_hp > 10){knight -> current_hp --;}// for testing whether draws correct color
 
         // [H] 硬件同步与缓冲区翻转
         vga_wait_for_vsync(); 

@@ -24,6 +24,7 @@ void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_d
 void Draw_Transparent_Image_horizontal_flip(int start_x, int start_y, const unsigned char *img_data, int width, int height);
 void Draw_Transparent_Image_CW90(int start_x, int start_y, const unsigned char *img_data, int width, int height);
 void Draw_Transparent_Image_CCW90(int start_x, int start_y, const unsigned char *img_data, int width, int height);
+void vga_draw_health_bar(int x, int y, int current_hp, int max_hp, int bar_width, int bar_height);
 extern volatile int pixel_buffer_start; 
 
 #endif

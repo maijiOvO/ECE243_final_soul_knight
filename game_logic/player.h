@@ -12,6 +12,9 @@ typedef struct Player {
     int dir;
     int height;
     int width;
+    
+    int max_hp;
+    int current_hp;
 
     int current_frame;
     int anim_tick;

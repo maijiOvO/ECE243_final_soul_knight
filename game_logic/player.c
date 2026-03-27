@@ -11,6 +11,9 @@ void Player_Init(Player *p, int start_x, int start_y) {
     p->height = 32;
     p->width = 32;
 
+    p->max_hp = 100;      // 总血量 100
+    p->current_hp = 100;  // 初始满血
+
     p->current_frame = 0;
     p->anim_tick = 0;
     p->anim_speed = 6;   // 60Hz 下，每 6 帧切一张图 (10 FPS 动画)
