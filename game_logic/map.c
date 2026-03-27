@@ -1,6 +1,7 @@
 #include "map.h"
 #include <stdlib.h>
 #include "../hardware/vga.h"
+#include "../hardware/ps2.h"
 #include "../sources/knight_anim.h"
 #include "../sources/map_texture.h"
 #include "player.h"
@@ -22,56 +23,135 @@ int init_y = 6;
 int current_room_x = 6;
 int current_room_y = 6;
 
-void init_world_map(){
-    // 1. 初始化地图，全部设为不存在
-    for (int i = 0; i < world_map_max; i ++){
-        for (int j = 0; j < world_map_max; j ++){
+// 检查玩家是否正在尝试与宝箱交互
+void handle_chest_interaction(Player *p) {
+    // 1. 只在宝箱房生效
+    Room *cur_room = &world_map[current_room_x][current_room_y];
+    if (cur_room->type != 'C') return;
+
+    // 2. 计算玩家中心与房间中心(宝箱位置)的距离
+    // 假设宝箱画在 (150, 110)
+    int chest_center_x = 150 + 10; 
+    int chest_center_y = 110 + 10;
+    int player_center_x = p->x + (p->width / 2);
+    int player_center_y = p->y + (p->height / 2);
+
+    int dist_x = abs(player_center_x - chest_center_x);
+    int dist_y = abs(player_center_y - chest_center_y);
+
+    // 3. 判定范围：如果距离宝箱小于 35 像素
+    if (dist_x < 35 && dist_y < 35) {
+        
+        // 如果宝箱还没开，显示交互提示
+        if (!cur_room->is_opened) {
+            // 在玩家头顶画一个绿色的“F”提示（这里用一个4x4像素点代替，你可以画更复杂的）
+            // 坐标：玩家头顶上方 8 像素
+            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 10, 4, 4, Green);
+
+            // 4. 检测按键：按下 F 键瞬间开启
+            if (key_F) {
+                cur_room->is_opened = 1;
+                // 可以在这里加入即时反馈，比如满血
+                p->current_hp = p->max_hp;
+            }
+        }
+    }
+}
+
+void draw_room_objects() {
+    Room cur = world_map[current_room_x][current_room_y];
+
+    if (cur.type == 'C') {
+        // 宝箱位置固定在 (160, 120)
+        if (cur.is_opened) {
+            // 画开启后的贴图 box[0]
+            Draw_Transparent_Image(150, 110, box[0], 20, 20);
+        } else {
+            // 画关闭的贴图 box[1]
+            Draw_Transparent_Image(150, 110, box[1], 20, 20);
+        }
+    }
+}
+
+void init_world_map() {
+    // 1. 彻底清空（防止 Restart 后的脏数据）
+    for (int i = 0; i < 13; i++) {
+        for (int j = 0; j < 13; j++) {
             world_map[i][j].exists = 0;
+            world_map[i][j].is_cleared = 0;
+            world_map[i][j].type = ' ';
         }
     }
 
+    // 2. 准备坐标记录表（数组大小要大于等于 max_rooms）
+    int rooms_x[16], rooms_y[16]; 
+    int count = 0;
+    max_rooms = 7; // 建议设为 7-8 比较好玩
+
+    // 3. 设置起点
     current_room_x = 6;
     current_room_y = 6;
-
-    int count = 1;
-    max_rooms = 6; // 🌟 修复：加上分号
-
-    // 2. 设置起始房间
     world_map[6][6].exists = 1;
-    world_map[6][6].is_cleared = 1; // 🌟 起点设为已清空，保证安全
+    world_map[6][6].is_cleared = 1;
+    world_map[6][6].type = 'I'; // Initial
+    rooms_x[count] = 6; 
+    rooms_y[count] = 6;
+    count++;
 
+    // 4. 随机漫步
     int rx = 6, ry = 6;
     while(count < max_rooms) {
         int dir = rand() % 4;
-        if(dir == 0) ry--;      // up
-        else if(dir == 1) ry++; // down
-        else if(dir == 2) rx--; // left
-        else rx++;              // right
+        if      (dir == 0) ry--;
+        else if (dir == 1) ry++;
+        else if (dir == 2) rx--;
+        else               rx++;
 
-        // 🌟 修复：增加边界检查，防止 rx/ry 跑到数组外面 (0-12 范围)
-        if (rx < 0 || rx >= world_map_max || ry < 0 || ry >= world_map_max) {
-            rx = 6; ry = 6; // 跑出去了就重置回起点重新长
-            continue;
+        // 边界保护
+        if (rx < 0 || rx >= 13 || ry < 0 || ry >= 13) {
+            rx = 6; ry = 6; continue;
         }
 
         if (world_map[rx][ry].exists == 0) {
             world_map[rx][ry].exists = 1;
+            world_map[rx][ry].is_cleared = 1; // 调试期全开，后期改为 0
+            world_map[rx][ry].type = 'M';    // Monster
             
-            // 🌟 核心：新生成的房间必须是【未清空】状态
-            world_map[rx][ry].is_cleared = 0; 
-        
+            // 为新房间生成种子
             RoomSeeds *s = &world_map[rx][ry].seeds;
             s->num_clusters = rand() % 3 + 2;
             s->current_inner_texture = rand() % 5;
-        
-            for (int i = 0; i < 4; i++) {
-                s->shape[i] = rand() % 5;
-                s->cx[i] = rand() % 3 + 2;
-                s->cy[i] = rand() % 4 + 3;
+            for (int k = 0; k < 4; k++) {
+                s->shape[k] = rand() % 5;
+                s->cx[k] = rand() % 3 + 2;
+                s->cy[k] = rand() % 4 + 3;
             }
+
+            // 记录位置用于计算 Boss 房
+            rooms_x[count] = rx;
+            rooms_y[count] = ry;
             count++;
-            // 🌟 修复：删掉了原本这里的 is_cleared = 1
         }
+    }
+
+    // 5. 寻找最远点作为 Boss 房
+    int max_dist = -1, boss_idx = -1;
+    for (int i = 1; i < count; i++) {
+        int dist = abs(rooms_x[i] - 6) + abs(rooms_y[i] - 6);
+        if (dist > max_dist) {
+            max_dist = dist;
+            boss_idx = i;
+        }
+    }
+    if (boss_idx != -1) world_map[rooms_x[boss_idx]][rooms_y[boss_idx]].type = 'B';
+
+    // 6. 随机选一个不是起点也不是 Boss 的房间作为宝箱房
+    if (count > 2) {
+        int c_idx;
+        do { c_idx = rand() % count; } while (c_idx == 0 || c_idx == boss_idx);
+        world_map[rooms_x[c_idx]][rooms_y[c_idx]].type = 'C';
+        world_map[rooms_x[c_idx]][rooms_y[c_idx]].is_cleared = 1;
+        world_map[rooms_x[c_idx]][rooms_y[c_idx]].seeds.num_clusters = 0;
     }
 }
 
@@ -116,7 +196,7 @@ int handle_room_transition(Player *p) { // return 1 if jumped
         vga_wait_for_vsync(); 
         clear_screen(); 
         
-        // 🌟 4. 在这里刷怪！把刚刚算好的新房间坐标传进去
+        // 在这里刷怪！把刚刚算好的新房间坐标传进去
         Spawn_Enemies_For_Room(current_room_x, current_room_y);
     }
 
@@ -124,41 +204,55 @@ int handle_room_transition(Player *p) { // return 1 if jumped
 }
 
 void draw_world_map() {
-    int min_i = 4, min_j = 4; // 初始设为最大值
+    int min_i = 13, min_j = 13;
+    bool any_room = false;
 
-    // 2. 第二遍扫描：绘图
-    int map_offset_x = 10; // 小地图距离屏幕左边的边距
-    int map_offset_y = 10; // 小地图距离屏幕顶部的边距
-    int room_size = 6;     // 每个小房间方块的大小
-    int spacing = 8;      // 房间中心之间的间距 (留2像素空隙)
-
-    //vga_draw_rect(0, 0, room_size * 7, room_size * 8, Grey);
-
+    // 1. 第一遍扫描：动态寻找当前所有房间的最左上角坐标
     for (int i = 0; i < 13; i++) {
         for (int j = 0; j < 13; j++) {
             if (world_map[i][j].exists) {
-                // 计算在屏幕上的绝对像素坐标
-                // (i - min_i) 确保最左边的房间从 0 开始算
+                if (i < min_i) min_i = i;
+                if (j < min_j) min_j = j;
+                any_room = true;
+            }
+        }
+    }
+    if (!any_room) return;
+
+    // 2. 绘图参数
+    int map_offset_x = 15; 
+    int map_offset_y = 15;
+    int room_size = 6;
+    int spacing = 8;
+
+    // 3. 第二遍扫描：绘制
+    for (int i = 0; i < 13; i++) {
+        for (int j = 0; j < 13; j++) {
+            if (world_map[i][j].exists) {
                 int draw_x = map_offset_x + (i - min_i) * spacing;
                 int draw_y = map_offset_y + (j - min_j) * spacing;
 
-                // 3. 区分颜色显示
                 short int color;
+                // 玩家当前所在位置（最高优先级）
                 if (i == current_room_x && j == current_room_y) {
-                    color = Green; // 玩家当前所在房间用绿色
-                } else if (world_map[i][j].is_cleared) {
-                    color = Blue;  // 已清空的房间用蓝色
-                } else {
-                    color = Red;   // 有怪的房间用红色
+                    color = Green;
+                } 
+                // 其他房间
+                else {
+                    char type = world_map[i][j].type;
+                    if (type == 'B') color = Pink;       // Boss 房
+                    else if (type == 'C') color = 0xFFE0; // 宝箱房 (黄)
+                    else color = Blue;                    // 已清空/普通房
                 }
-
-                // 绘制小方块 (可以使用你之前的画矩形函数)
-                vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                
+                // 保护性绘图：确保不越界
+                if (draw_x >= 0 && draw_y >= 0) {
+                    vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                }
             }
         }
     }
 }
-
 void init_walls() {
     // 1. 初始化清空数组 (确保每次重新生成都是一张白纸)
     for(int x = 0; x < GRID_W; x++) {

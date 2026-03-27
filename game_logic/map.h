@@ -29,9 +29,13 @@ typedef struct {
 
 typedef struct {
     int exists;
-    int is_cleared;
+    int is_cleared; 
+    int is_opened;   // 【新增】：专门标记宝箱是否被打开过
+    char type;       
     RoomSeeds seeds;
 } Room;
+
+extern Room world_map[world_map_max][world_map_max];
 
 void init_walls();
 void draw_walls();
@@ -41,5 +45,7 @@ int can_move_to(int new_x, int new_y, int player_width, int player_height);
 int handle_room_transition(Player *p);
 void apply_doors_to_walls();
 void draw_portals();
+void handle_chest_interaction(Player *p);
+void draw_room_objects();
 
 #endif

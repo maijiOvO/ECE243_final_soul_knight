@@ -3,4 +3,5 @@
 extern const unsigned char * dungeon ;
 extern const unsigned char * background_ptr;
 extern const unsigned char * portal[8];
+extern const unsigned char * box[2];
 #endif

@@ -7,7 +7,7 @@
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
 #include "../sources/map_texture.h"
-#include "game_logic/enemy.h" 
+#include "enemy.h" 
 
 // 颜色定义
 #define COLOR_MAGENTA_565  0xF81F 
@@ -104,6 +104,9 @@ int main(void) {
         draw_walls();
         draw_portals();
         draw_world_map();
+
+        handle_chest_interaction(knight);
+        draw_room_objects();
 
         // [F] 绘制实体
         Player_Draw(knight);

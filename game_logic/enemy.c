@@ -69,8 +69,6 @@ void Enemy_Init_Random(Enemy *e) {
     e->hp = e->max_hp;
 }
 
-
-
 // 僵尸状态更新
 // 🌟 核心改动：参数里增加了 player_x 和 player_y
 void Enemy_Update(Enemy *e, int player_x, int player_y) {
@@ -184,7 +182,8 @@ void Enemy_Draw(Enemy *e) {
 void Spawn_Enemies_For_Room(int rx, int ry) {
     num_enemies = 0; // 进新房间先清零
 
-    if (rx == 6 && ry == 6) return; // 出生点绝对不刷怪
+    if (rx == 6 && ry == 6) return; // 出生点绝对不刷
+    if (world_map[rx][ry].type == 'C') return; 
 
     // --- 🌟 核心控制区：按探索顺序给房间“盖章” ---
     // 如果这个房间还是未分配的 (0)，说明是第一次进来

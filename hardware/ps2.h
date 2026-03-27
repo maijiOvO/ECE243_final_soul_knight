@@ -5,6 +5,7 @@
 extern int key_W;
 extern int key_A;
 extern int key_S;
+extern int key_F;
 
 typedef struct {
     int x, y;           // 准星在屏幕上的绝对坐标
