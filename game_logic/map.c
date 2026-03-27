@@ -6,6 +6,8 @@
 #include "player.h"
 #define PORTAL_ANIM_SPEED 6
 
+#include "enemy.h"
+
 int portal_frame = 0;
 int portal_tick = 0;
 int current_inner_texture = 0;
@@ -21,6 +23,7 @@ int current_room_x = 6;
 int current_room_y = 6;
 
 void init_world_map(){
+    // 1. 初始化地图，全部设为不存在
     for (int i = 0; i < world_map_max; i ++){
         for (int j = 0; j < world_map_max; j ++){
             world_map[i][j].exists = 0;
@@ -31,11 +34,12 @@ void init_world_map(){
     current_room_y = 6;
 
     int count = 1;
-    max_rooms = rand()%2 +5;
+    max_rooms = 6; // 🌟 修复：加上分号
 
-    // 确保起始房间默认是清空的，否则一出生就被怪围住
-    world_map[current_room_x][current_room_y].is_cleared = 1; 
-    world_map[current_room_x][current_room_y].exists = 1;
+    // 2. 设置起始房间
+    world_map[6][6].exists = 1;
+    world_map[6][6].is_cleared = 1; // 🌟 起点设为已清空，保证安全
+
     int rx = 6, ry = 6;
     while(count < max_rooms) {
         int dir = rand() % 4;
@@ -44,8 +48,17 @@ void init_world_map(){
         else if(dir == 2) rx--; // left
         else rx++;              // right
 
+        // 🌟 修复：增加边界检查，防止 rx/ry 跑到数组外面 (0-12 范围)
+        if (rx < 0 || rx >= world_map_max || ry < 0 || ry >= world_map_max) {
+            rx = 6; ry = 6; // 跑出去了就重置回起点重新长
+            continue;
+        }
+
         if (world_map[rx][ry].exists == 0) {
             world_map[rx][ry].exists = 1;
+            
+            // 🌟 核心：新生成的房间必须是【未清空】状态
+            world_map[rx][ry].is_cleared = 0; 
         
             RoomSeeds *s = &world_map[rx][ry].seeds;
             s->num_clusters = rand() % 3 + 2;
@@ -56,18 +69,13 @@ void init_world_map(){
                 s->cx[i] = rand() % 3 + 2;
                 s->cy[i] = rand() % 4 + 3;
             }
-        count++;
-        world_map[rx][ry].is_cleared = 1;
+            count++;
+            // 🌟 修复：删掉了原本这里的 is_cleared = 1
         }
-        else{continue;}
     }
 }
 
 void apply_doors_to_walls() {       // the position of walls
-    // 只有房间清空了才执行开门逻辑
-    if (world_map[current_room_x][current_room_y].is_cleared == 0) {
-        return; 
-    }
 
     // 检查上方：如果北边有房间，挖开顶部中间
     if (world_map[current_room_x][current_room_y - 1].exists) {
@@ -102,19 +110,14 @@ int handle_room_transition(Player *p) { // return 1 if jumped
     }
 
     if (teleported) {
-        // 1. 重新生成地形（掩体随机变化）
         init_walls();
-        
-        // 2. 根据逻辑打开新房间的大门
-        // 如果新房间之前打过了，门是开的；如果没打过，门是关的
         apply_doors_to_walls();
-
-        // 3. 彻底重置双缓冲，防止旧房间残影（这是最简洁的处理方式）
         clear_screen(); 
-        vga_wait_for_vsync(); // 等待同步
+        vga_wait_for_vsync(); 
         clear_screen(); 
         
-        // 4. (预留) 在这里可以根据 is_cleared 决定是否刷怪
+        // 🌟 4. 在这里刷怪！把刚刚算好的新房间坐标传进去
+        Spawn_Enemies_For_Room(current_room_x, current_room_y);
     }
 
     return teleported;
@@ -252,33 +255,34 @@ void draw_portals() {
                 int cur_y = 20 * j;
 
                 // --- 情况 A：顶部门 (walls[7][0], walls[8][0]) ---
-                // 我们只在 i=7 的时候画，一次性覆盖 7和8 两个格子
                 if (j == 0 && i == 7) {
-                    // 原始 20x40 顺时针转 90 度变成 40x20
                     Draw_Transparent_Image_CCW90(cur_x, cur_y, current_portal_img, 20, 40);
                 }
 
                 // --- 情况 B：底部门 (walls[7][11], walls[8][11]) ---
                 else if (j == GRID_H - 1 && i == 7) {
-                    // 同样旋转 90 度
                     Draw_Transparent_Image_CW90(cur_x, cur_y, current_portal_img, 20, 40);
                 }
 
                 // --- 情况 C：左侧门 (walls[0][5], walls[0][6]) ---
-                // 我们只在 j=5 的时候画，一次性向下覆盖 5和6 两个格子
                 else if (i == 0 && j == 5) {
-                    // 垂直方向，无需旋转，直接画
                     Draw_Transparent_Image_horizontal_flip(cur_x, cur_y, current_portal_img, 20, 40);
                 }
 
                 // --- 情况 D：右侧门 (walls[15][5], walls[15][6]) ---
                 else if (i == GRID_W - 1 && j == 5) {
-                    // 垂直方向，直接画
                     Draw_Transparent_Image(cur_x, cur_y, current_portal_img, 20, 40);
                 }
             }
         }
     }
+
+    // ==========================================
+    // 🌟 核心修改：在画完传送门后，顺便更新并画出怪物
+    // 因为 main.c 每一帧都会调用 draw_portals，
+    // 所以这里的怪物也会跟着每一帧更新和渲染！
+    // ==========================================
+   
 }
 
 int can_move_to(int new_x, int new_y, int player_width, int player_height) {

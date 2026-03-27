@@ -95,8 +95,16 @@ void Draw_Transparent_Image(int start_x, int start_y, const unsigned char *img_d
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             uint16_t current_color = pixels[y * width + x];
-            if (current_color != COLOR_MAGENTA_565) {
-                plot_pixel(start_x + x, start_y + y, current_color);
+
+            // 🌟 1. 拆解 RGB565 颜色分量
+            int r = (current_color >> 11) & 0x1F; // 红色 (5位, 0-31)
+            int g = (current_color >> 5) & 0x3F;  // 绿色 (6位, 0-63)
+            int b = current_color & 0x1F;         // 蓝色 (5位, 0-31)
+
+            // 🌟 2. 范围判定：只要满足“红蓝双高、绿低”的特征，就视为透明背景
+            // 逻辑是：如果【不是】这种粉色杂质，才进行 plot_pixel
+            if (!(r > 20 && b > 20 && g < 10)) {
+                plot_pixel(start_x + x, start_y + y, current_color); //
             }
         }
     }
@@ -108,7 +116,15 @@ void Draw_Transparent_Image_horizontal_flip(int start_x, int start_y, const unsi
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             uint16_t current_color = pixels[y * width + x];
-            if (current_color != COLOR_MAGENTA_565) {
+            
+            // 🌟 1. 拆解 RGB565 分量 (范围过滤的核心)
+            int r = (current_color >> 11) & 0x1F;
+            int g = (current_color >> 5) & 0x3F;
+            int b = current_color & 0x1F;
+
+            // 🌟 2. 范围判定：红蓝高、绿低 (包含并超越了原本的 COLOR_MAGENTA_565)
+            if (!(r > 20 && b > 20 && g < 10)) {
+                // 🌟 3. 翻转坐标逻辑保持不变
                 plot_pixel(start_x + width - 1 - x, start_y + y, current_color);
             }
         }

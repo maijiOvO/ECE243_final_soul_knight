@@ -7,6 +7,7 @@
 #include "../hardware/vga.h"
 #include "../sources/knight_anim.h"
 #include "../sources/map_texture.h"
+#include "game_logic/enemy.h" 
 
 // 颜色定义
 #define COLOR_MAGENTA_565  0xF81F 
@@ -66,6 +67,8 @@ int main(void) {
     current_room_y = 6;
     init_walls();
 
+    Spawn_Enemies_For_Room(current_room_x, current_room_y);
+
     //游戏正式主循环
     while(1) {
         // [A] 读取输入
@@ -80,6 +83,8 @@ int main(void) {
         // [B] 逻辑更新
         Player_Update(knight, dx, dy);
         Weapon_Update(init_weapon, knight, &mouse);
+
+        Update_All_Enemies(knight->x, knight->y);
 
         // [C] 房间切换处理
         if (handle_room_transition(knight)) {
@@ -104,6 +109,8 @@ int main(void) {
         Player_Draw(knight);
         Weapon_Draw(init_weapon, knight);
         Bullet_Draw(init_weapon, current_buffer);
+
+        Draw_All_Enemies();
 
         // 绘制准星 (绿色十字)
         vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
