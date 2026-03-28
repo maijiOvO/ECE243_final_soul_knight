@@ -46,9 +46,9 @@ void handle_chest_interaction(Player *p) {
         if (!cur_room->is_opened) {
             // 在玩家头顶画一个绿色的“F”提示（这里用一个4x4像素点代替，你可以画更复杂的）
             // 坐标：玩家头顶上方 8 像素
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 6, 1, Green);
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 15, 6, 1, Green);
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 1, 10, Green);
+            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 6, 1, 0xffff);
+            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 15, 6, 1, 0xffff);
+            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 1, 10, 0xffff);
 
             // 4. 检测按键：按下 F 键瞬间开启
             if (key_F) {
@@ -224,8 +224,8 @@ void draw_world_map() {
     // 2. 绘图参数
     int map_offset_x = 15; 
     int map_offset_y = 15;
-    int room_size = 6;
-    int spacing = 8;
+    int room_size = 9;
+    int spacing = 11;
 
     // 3. 第二遍扫描：绘制
     for (int i = 0; i < 13; i++) {
@@ -234,23 +234,39 @@ void draw_world_map() {
                 int draw_x = map_offset_x + (i - min_i) * spacing;
                 int draw_y = map_offset_y + (j - min_j) * spacing;
 
-                short int color;
-                // 玩家当前所在位置（最高优先级）
-                if (i == current_room_x && j == current_room_y) {
-                    color = Green;
-                } 
-                // 其他房间
-                else {
-                    char type = world_map[i][j].type;
-                    if (type == 'B') color = Pink;       // Boss 房
-                    else if (type == 'C') color = 0xFFE0; // 宝箱房 (黄)
-                    else color = Blue;                    // 已清空/普通房
-                }
+                short int color = Grey;
+                char type = world_map[i][j].type;
                 
-                // 保护性绘图：确保不越界
-                if (draw_x >= 0 && draw_y >= 0) {
-                    vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                if (type == 'B') {//boss room
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[0], 8, 8);  // draw boss icon
+                    }
                 }
+                else if (type == 'C'){//chest room
+                    //color = 0xFFE0;
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        if(world_map[current_room_x][current_room_y].is_opened){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[2], 8, 8);}
+                        else{Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[1], 8, 8);}
+                    }
+                } 
+                else {
+                    //color = Blue;
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        if(world_map[current_room_x][current_room_y].is_cleared){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[3], 8, 8);}
+                        else {Draw_Transparent_Image(draw_x, draw_y, map_icon[5], 8, 8);}
+                    }
+                }
+                if (i == current_room_x && j == current_room_y) {//green frame for current room
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y - 1, room_size, 0, Green);
+                        vga_draw_rect(draw_x - 1, draw_y, 0, room_size, Green);
+                        vga_draw_rect(draw_x, draw_y + room_size + 1 , room_size, 0, Green);
+                        vga_draw_rect(draw_x + room_size + 1, draw_y, 0, room_size, Green);
+                    }
+                } 
             }
         }
     }
