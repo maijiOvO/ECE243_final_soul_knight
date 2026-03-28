@@ -10,6 +10,7 @@
 #include "../sources/mimic_anim.h"  
 #include "../sources/boss_anim.h" 
 #include "../sources/boss_attack_anim.h" 
+#include "../sources/mimic_anim.h"
 
 // ==========================================
 // 🌟 1. 魔法特效应有尽有的定义区
