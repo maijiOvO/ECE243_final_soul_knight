@@ -273,6 +273,8 @@ extern int num_enemies;
 void Spawn_Enemies_For_Room(int rx, int ry);
 void Draw_All_Enemies();
 void Update_All_Enemies(int player_x, int player_y, int is_j_pressed);
+void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h);
+void Draw_Boss_FX();
 
 #endif
 // --- End of game_logic/enemy.h ---
@@ -467,23 +469,24 @@ extern const MonsterFrame mimic_death_frames[];          // 64x64 (彻底死亡�
 #ifndef BOSS_ANIM_H
 #define BOSS_ANIM_H
 
-// 🌟 防撞护盾：如果没定义过，才定义它
-#ifndef MONSTER_FRAME_STRUCT_DEFINED
-#define MONSTER_FRAME_STRUCT_DEFINED
+// 🌟 防撞护盾：宏定义的名字也建议跟着改一下，保持规范
+#ifndef BOSS_FRAME_STRUCT_DEFINED
+#define BOSS_FRAME_STRUCT_DEFINED
 typedef struct {
     const unsigned char* data;
     int w;
     int h;
-} MonsterFrame;
+} BossFrame; // 👉 第一处修改：把 MonsterFrame 改成 BossFrame
 #endif
 
 // 声明本体动作
-extern const MonsterFrame boss_idle_frames[];
-extern const MonsterFrame boss_walk_frames[];
-extern const MonsterFrame boss_attack_frames[]; // 这里的 attack 是指 Boss 挥法杖的物理动作
-extern const MonsterFrame boss_ultimate_frames[];
-extern const MonsterFrame boss_hurt_frames[];
-extern const MonsterFrame boss_death_frames[];
+// 👉 第二处修改：把下面所有的 MonsterFrame 都替换成 BossFrame
+extern const BossFrame boss_idle_frames[];
+extern const BossFrame boss_walk_frames[];
+extern const BossFrame boss_attack_frames[]; 
+extern const BossFrame boss_ultimate_frames[];
+extern const BossFrame boss_hurt_frames[];
+extern const BossFrame boss_death_frames[];
 
 #endif
 // --- End of sources/boss_anim.h ---
@@ -492,20 +495,13 @@ extern const MonsterFrame boss_death_frames[];
 #ifndef BOSS_ATTACK_ANIM_H
 #define BOSS_ATTACK_ANIM_H
 
-// 🌟 防撞护盾：如果前面已经定义过了，这块代码就会自动隐身！
-#ifndef MONSTER_FRAME_STRUCT_DEFINED
-#define MONSTER_FRAME_STRUCT_DEFINED
-typedef struct {
-    const unsigned char* data;
-    int w;
-    int h;
-} MonsterFrame;
-#endif
+// 🌟 核心修改：删掉这里错误的结构体定义，直接引入正确的头文件！
+// Stripped local include: #include "boss_anim.h"
 
-// 声明特效动作
-extern const MonsterFrame tornado_frames[];
-extern const MonsterFrame smear_frames[];
-extern const MonsterFrame fire_frames[];
+// 声明数组给 enemy.c 使用
+extern const BossFrame boss_tornado_frames[];
+extern const BossFrame boss_fire_frames[];
+extern const BossFrame boss_smear_frames[];
 
 #endif
 // --- End of sources/boss_attack_anim.h ---
@@ -517,6 +513,7 @@ extern const unsigned char * dungeon ;
 extern const unsigned char * background_ptr;
 extern const unsigned char * portal[8];
 extern const unsigned char * box[2];
+extern const unsigned char * map_icon[6];
 #endif
 // --- End of sources/map_texture.h ---
 
@@ -588,6 +585,7 @@ int main(void) {
         if (key_W || key_A || key_S || key_D) {
             break; 
         }
+        vga_wait_for_vsync(); // 🌟 加上这一句！踩住刹车，防止 CPU 瞬间跑飞！
     }
     srand(random_seed); 
 
@@ -646,6 +644,9 @@ int main(void) {
 
         Draw_All_Enemies();
 
+        Update_Boss_FX(knight->x, knight->y, knight->width, knight->height); 
+        Draw_Boss_FX();
+
         // 绘制准星 (绿色十字)
         vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
         vga_draw_rect(mouse.x + 2, mouse.y, 1, 5, Green);
@@ -692,7 +693,6 @@ int portal_tick = 0;
 int current_inner_texture = 0;
 int max_rooms = 0;
 int walls[16][12] = {0};
-extern int walls[GRID_W][GRID_H];
 
 Room world_map[world_map_max][world_map_max];     //13 * 13 room space
 Room seed_map[world_map_max][world_map_max];
@@ -722,11 +722,12 @@ void handle_chest_interaction(Player *p) {
         
         // 如果宝箱还没开，显示交互提示
         if (!cur_room->is_opened) {
-            // 在玩家头顶画一个绿色的感叹号 “!” 提示玩家按 J (替换掉原来的 F 形状)
+            
+            // 在玩家头顶画一个绿色的感叹号 “!” 提示玩家按 J
             vga_draw_rect(p->x + (p->width/2) - 1, p->y - 20, 2, 8, Green); // 感叹号的上半部分
             vga_draw_rect(p->x + (p->width/2) - 1, p->y - 10, 2, 2, Green); // 感叹号的点
 
-            // 4. 🌟 修改：检测按键，按下 J 键瞬间开启 (替换了 key_F)
+            // 4. 🌟 检测按键，按下 J 键瞬间开启宝箱
             if (key_J) {
                 cur_room->is_opened = 1;
                 // 可以在这里加入即时反馈，比如满血
@@ -900,8 +901,8 @@ void draw_world_map() {
     // 2. 绘图参数
     int map_offset_x = 15; 
     int map_offset_y = 15;
-    int room_size = 6;
-    int spacing = 8;
+    int room_size = 9;
+    int spacing = 11;
 
     // 3. 第二遍扫描：绘制
     for (int i = 0; i < 13; i++) {
@@ -910,23 +911,39 @@ void draw_world_map() {
                 int draw_x = map_offset_x + (i - min_i) * spacing;
                 int draw_y = map_offset_y + (j - min_j) * spacing;
 
-                short int color;
-                // 玩家当前所在位置（最高优先级）
-                if (i == current_room_x && j == current_room_y) {
-                    color = Green;
-                } 
-                // 其他房间
-                else {
-                    char type = world_map[i][j].type;
-                    if (type == 'B') color = Pink;       // Boss 房
-                    else if (type == 'C') color = 0xFFE0; // 宝箱房 (黄)
-                    else color = Blue;                    // 已清空/普通房
-                }
+                short int color = Grey;
+                char type = world_map[i][j].type;
                 
-                // 保护性绘图：确保不越界
-                if (draw_x >= 0 && draw_y >= 0) {
-                    vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                if (type == 'B') {//boss room
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[0], 8, 8);  // draw boss icon
+                    }
                 }
+                else if (type == 'C'){//chest room
+                    //color = 0xFFE0;
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        if(world_map[current_room_x][current_room_y].is_opened){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[2], 8, 8);}
+                        else{Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[1], 8, 8);}
+                    }
+                } 
+                else {
+                    //color = Blue;
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
+                        if(world_map[current_room_x][current_room_y].is_cleared){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[3], 8, 8);}
+                        else {Draw_Transparent_Image(draw_x, draw_y, map_icon[5], 8, 8);}
+                    }
+                }
+                if (i == current_room_x && j == current_room_y) {//green frame for current room
+                    if (draw_x >= 0 && draw_y >= 0) {
+                        vga_draw_rect(draw_x, draw_y - 1, room_size, 0, Green);
+                        vga_draw_rect(draw_x - 1, draw_y, 0, room_size, Green);
+                        vga_draw_rect(draw_x, draw_y + room_size + 1 , room_size, 0, Green);
+                        vga_draw_rect(draw_x + room_size + 1, draw_y, 0, room_size, Green);
+                    }
+                } 
             }
         }
     }
@@ -1604,6 +1621,8 @@ void Enemy_Draw(Enemy *e) {
     }
     // 👇👇👇 🌟 补齐：亡灵法师图片数据挂载 🌟 👇👇👇
     else if (e->type == ENEMY_TYPE_NECRO) {
+        const BossFrame *f = NULL; // 🌟 关键修改：使用 BossFrame 而不是 MonsterFrame
+        
         if (e->state == 0) { current_image = boss_idle_frames[e->current_frame].data; draw_width = boss_idle_frames[e->current_frame].w; draw_height = boss_idle_frames[e->current_frame].h; }
         else if (e->state == 1) { current_image = boss_walk_frames[e->current_frame].data; draw_width = boss_walk_frames[e->current_frame].w; draw_height = boss_walk_frames[e->current_frame].h; }
         else if (e->state == 2) { current_image = boss_attack_frames[e->current_frame].data; draw_width = boss_attack_frames[e->current_frame].w; draw_height = boss_attack_frames[e->current_frame].h; }
@@ -1767,14 +1786,16 @@ void Draw_Boss_FX() {
         if (!boss_fx_list[i].active) continue;
         BossFX *fx = &boss_fx_list[i];
         const unsigned char *img = NULL;
-        if (fx->type == FX_TYPE_TORNADO) img = tornado_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_FIRE) img = fire_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_SMEAR) img = smear_frames[fx->anim_frame].data;
+
+        // 🌟 这里的数组名（如 tornado_frames）必须在 boss_attack_anim.h 里定义过
+        // 且它们的类型也应该是 BossFrame 或 MonsterFrame
+        if (fx->type == FX_TYPE_TORNADO) img = boss_tornado_frames[fx->anim_frame].data;
+        else if (fx->type == FX_TYPE_FIRE) img = boss_fire_frames[fx->anim_frame].data;
+        else if (fx->type == FX_TYPE_SMEAR) img = boss_smear_frames[fx->anim_frame].data;
         
         if (img) Draw_Transparent_Image(fx->x, fx->y, img, fx->width, fx->height);
     }
 }
-// 👆👆👆 🌟 补齐结束 🌟 👆👆👆
 // --- End of game_logic/enemy.c ---
 
 // --- Start of game_logic/weapon.c ---
@@ -55341,7 +55362,7 @@ const MonsterFrame mimic_stationary_frames[] = {
 // --- End of sources/mimic_anim.c ---
 
 // --- Start of sources/boss_anim.c ---
-// Stripped local include: #include "boss_idle_anim.h"
+// Stripped local include: #include "boss_anim.h"
 
 // boss_idel_01.bmp (160x128)
 static const unsigned char data_boss_idel_01[] = {
@@ -260488,7 +260509,8 @@ static const unsigned char data_boss_death_09[] = {
     
 };
 
-const MonsterFrame boss_death_frames[] = {
+// 把所有的 MonsterFrame 替换成 BossFrame，彻底解决重名冲突
+const BossFrame boss_death_frames[] = {
     {data_boss_death_01, 160, 128},
     {data_boss_death_02, 160, 128},
     {data_boss_death_03, 160, 128},
@@ -260500,8 +260522,7 @@ const MonsterFrame boss_death_frames[] = {
     {data_boss_death_09, 160, 128},
 };
 
-
-const MonsterFrame boss_hurt_frames[] = {
+const BossFrame boss_hurt_frames[] = {
     {data_boss_hurt_01, 160, 128},
     {data_boss_hurt_02, 160, 128},
     {data_boss_hurt_03, 160, 128},
@@ -260509,8 +260530,7 @@ const MonsterFrame boss_hurt_frames[] = {
     {data_boss_hurt_05, 160, 128},
 };
 
-
-const MonsterFrame boss_ultimate_frames[] = {
+const BossFrame boss_ultimate_frames[] = {
     {data_boss_ultimate_01, 160, 128},
     {data_boss_ultimate_02, 160, 128},
     {data_boss_ultimate_03, 160, 128},
@@ -260530,8 +260550,7 @@ const MonsterFrame boss_ultimate_frames[] = {
     {data_boss_ultimate_17, 160, 128},
 };
 
-
-const MonsterFrame boss_attack_frames[] = {
+const BossFrame boss_attack_frames[] = {
     {data_boss_attack_01, 160, 128},
     {data_boss_attack_02, 160, 128},
     {data_boss_attack_03, 160, 128},
@@ -260547,8 +260566,7 @@ const MonsterFrame boss_attack_frames[] = {
     {data_boss_attack_13, 160, 128},
 };
 
-
-const MonsterFrame boss_walk_frames[] = {
+const BossFrame boss_walk_frames[] = {
     {data_boss_walk_01, 160, 128},
     {data_boss_walk_02, 160, 128},
     {data_boss_walk_03, 160, 128},
@@ -260559,8 +260577,7 @@ const MonsterFrame boss_walk_frames[] = {
     {data_boss_walk_08, 160, 128},
 };
 
-
-const MonsterFrame boss_idle_frames[] = {
+const BossFrame boss_idle_frames[] = {
     {data_boss_idel_01, 160, 128},
     {data_boss_idel_02, 160, 128},
     {data_boss_idel_03, 160, 128},
@@ -260570,7 +260587,6 @@ const MonsterFrame boss_idle_frames[] = {
     {data_boss_idel_07, 160, 128},
     {data_boss_idel_08, 160, 128},
 };
-
 // --- End of sources/boss_anim.c ---
 
 // --- Start of sources/boss_attack_anim.c ---
@@ -262690,22 +262706,21 @@ static const unsigned char data_fire_04[] = {
     
 };
 
-const MonsterFrame fire_frames[] = {
+const BossFrame boss_fire_frames[] = {
     {data_fire_01, 32, 32},
     {data_fire_02, 32, 32},
     {data_fire_03, 32, 32},
     {data_fire_04, 32, 32},
 };
 
-
-const MonsterFrame smear_frames[] = {
+const BossFrame boss_smear_frames[] = {
     {data_smear_01, 32, 32},
     {data_smear_02, 32, 32},
     {data_smear_03, 32, 32},
     {data_smear_04, 32, 32},
 };
 
-const MonsterFrame tornado_frames[] = {
+const BossFrame boss_tornado_frames[] = {
     {data_tornado_01, 32, 32},
     {data_tornado_02, 32, 32},
     {data_tornado_03, 32, 32},
@@ -262713,6 +262728,76 @@ const MonsterFrame tornado_frames[] = {
 };
 
 // --- End of sources/boss_attack_anim.c ---
+
+// --- Start of sources/boss.c ---
+static const unsigned char gImage_boss[136] = { 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,
+0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,
+0X1F,0XF8,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X1F,0XF8,
+0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X00,0X00,0X00,0X00,0X15,0X68,0X15,0X68,0X15,0X68,
+0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,
+};
+
+// --- End of sources/boss.c ---
+
+// --- Start of sources/box_close.c ---
+static const unsigned char gImage_box_close[136] = { 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XEF,0X7B,0XEF,0X7B,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0X21,0X41,0X21,0X41,0XC7,0X39,0XC7,0X39,0X21,0X41,0X21,0X41,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC7,0X39,0XC7,0X39,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+};
+
+// --- End of sources/box_close.c ---
+
+// --- Start of sources/box_open.c ---
+const unsigned char gImage_box[136] = { 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0XC7,0X39,0XC7,0X39,0X21,0X41,0X21,0X41,0X1F,0XF8,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC7,0X39,0XC7,0X39,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+};
+
+// --- End of sources/box_open.c ---
+
+// --- Start of sources/check.c ---
+static const unsigned char gImage_check[136] = { 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0XFF,0X07,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X5D,0X17,0XFF,0X07,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X9A,0X26,0XDF,0X07,0XFF,0X07,
+0X7D,0X0F,0XBA,0X26,0X1F,0XF8,0X1F,0XF8,0XFB,0X1E,0XDF,0X07,0X9E,0X0F,0X1F,0XF8,
+0XFF,0X07,0XFB,0X1E,0X7D,0X17,0X9E,0X0F,0XDF,0X07,0X5D,0X17,0X1F,0XF8,0X1F,0XF8,
+0X7D,0X17,0X7D,0X17,0XFF,0X07,0XFF,0X07,0X9E,0X0F,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X7D,0X17,0XFF,0X07,0X7D,0X0F,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+};
+
+// --- End of sources/check.c ---
+
+// --- Start of sources/Q.c ---
+static const unsigned char gImage_Q[136] = { 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X5E,0XF8,0X3F,0XF8,0XC0,0XC5,0X80,0XFF,0X80,0XFF,0XC0,0XC5,0X3F,0XF8,0X5E,0XF8,
+0X3F,0XF8,0X80,0XFF,0X80,0XFF,0XC0,0XC5,0XC0,0XC5,0X80,0XFF,0X00,0XCE,0X3F,0XF8,
+0X1F,0XF8,0X80,0XFF,0XC0,0XC5,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X80,0XFF,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X3F,0XF8,0X1F,0XF8,0X80,0XFF,0XC0,0XC5,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X00,0XCE,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0XC0,0XC5,0X80,0XFF,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X80,0XFF,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+};
+
+// --- End of sources/Q.c ---
 
 // --- Start of sources/map_texture.c ---
 // Stripped local include: #include "map_texture.h"
@@ -273481,6 +273566,60 @@ const unsigned char gImage_closed[800] = { //0X00,0X10,0X14,0X00,0X14,0X00,0X01,
 0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,
 0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X8A,0X52,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
 };
+const unsigned char gImage_boss[128] = { //0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,
+0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,
+0X1F,0XF8,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X1F,0XF8,
+0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,0X00,0X00,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,
+0X15,0X68,0X15,0X68,0X15,0X68,0X00,0X00,0X00,0X00,0X15,0X68,0X15,0X68,0X15,0X68,
+0X1F,0XF8,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X15,0X68,0X1F,0XF8,
+};
+
+const unsigned char gImage_box_close[128] = {// 0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XEF,0X7B,0XEF,0X7B,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0X21,0X41,0X21,0X41,0XC7,0X39,0XC7,0X39,0X21,0X41,0X21,0X41,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC7,0X39,0XC7,0X39,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+};
+
+const unsigned char gImage_box_open[136] = { //0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X21,0X41,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X00,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0XC7,0X39,0XC7,0X39,0X21,0X41,0X21,0X41,0X1F,0XF8,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC7,0X39,0XC7,0X39,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X21,0X41,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0XC5,0X8A,0X21,0X41,
+0X1F,0XF8,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X21,0X41,0X1F,0XF8,
+};
+const unsigned char gImage_check[128] = { //0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0XFF,0X07,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X5D,0X17,0XFF,0X07,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X9A,0X26,0XDF,0X07,0XFF,0X07,
+0X7D,0X0F,0XBA,0X26,0X1F,0XF8,0X1F,0XF8,0XFB,0X1E,0XDF,0X07,0X9E,0X0F,0X1F,0XF8,
+0XFF,0X07,0XFB,0X1E,0X7D,0X17,0X9E,0X0F,0XDF,0X07,0X5D,0X17,0X1F,0XF8,0X1F,0XF8,
+0X7D,0X17,0X7D,0X17,0XFF,0X07,0XFF,0X07,0X9E,0X0F,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X7D,0X17,0XFF,0X07,0X7D,0X0F,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+};
+const unsigned char gImage_exclaimation[128] = { //0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X00,0XF8,0X00,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+};
+
+
 
 const unsigned char * dungeon = gImage_dungeon_background;
 const unsigned char * background_ptr = background;
@@ -273494,9 +273633,29 @@ const unsigned char * portal[8] = {
     gImage_portal6,
     gImage_portal7
 };
+
+const unsigned char gImage_Q[128] = { //0X00,0X10,0X08,0X00,0X08,0X00,0X01,0X1B,
+0X5E,0XF8,0X3F,0XF8,0XC0,0XC5,0X80,0XFF,0X80,0XFF,0XC0,0XC5,0X3F,0XF8,0X5E,0XF8,
+0X3F,0XF8,0X80,0XFF,0X80,0XFF,0XC0,0XC5,0XC0,0XC5,0X80,0XFF,0X00,0XCE,0X3F,0XF8,
+0X1F,0XF8,0X80,0XFF,0XC0,0XC5,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X80,0XFF,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X3F,0XF8,0X1F,0XF8,0X80,0XFF,0XC0,0XC5,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X00,0XCE,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0XC0,0XC5,0X80,0XFF,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,0X80,0XFF,0X80,0XFF,0X1F,0XF8,0X1F,0XF8,0X1F,0XF8,
+};
+
 const unsigned char * box[2] = {
   gImage_opened,
   gImage_closed
+};
+const unsigned char * map_icon[6] = {
+  gImage_boss,
+  gImage_box_close,
+  gImage_box_open,
+  gImage_check,
+  gImage_exclaimation,
+  gImage_Q
 };
 // --- End of sources/map_texture.c ---
 
