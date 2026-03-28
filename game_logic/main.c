@@ -58,6 +58,7 @@ int main(void) {
         if (key_W || key_A || key_S || key_D) {
             break; 
         }
+        vga_wait_for_vsync(); // 🌟 加上这一句！踩住刹车，防止 CPU 瞬间跑飞！
     }
     srand(random_seed); 
 
@@ -115,6 +116,9 @@ int main(void) {
         Bullet_Draw(init_weapon, current_buffer);
 
         Draw_All_Enemies();
+
+        Update_Boss_FX(knight->x, knight->y, knight->width, knight->height); 
+        Draw_Boss_FX();
 
         // 绘制准星 (绿色十字)
         vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
