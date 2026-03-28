@@ -44,14 +44,12 @@ void handle_chest_interaction(Player *p) {
         
         // 如果宝箱还没开，显示交互提示
         if (!cur_room->is_opened) {
-            // 在玩家头顶画一个绿色的“F”提示（这里用一个4x4像素点代替，你可以画更复杂的）
-            // 坐标：玩家头顶上方 8 像素
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 6, 1, Green);
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 15, 6, 1, Green);
-            vga_draw_rect(p->x + (p->width/2) - 2, p->y - 20, 1, 10, Green);
+            // 在玩家头顶画一个绿色的感叹号 “!” 提示玩家按 J (替换掉原来的 F 形状)
+            vga_draw_rect(p->x + (p->width/2) - 1, p->y - 20, 2, 8, Green); // 感叹号的上半部分
+            vga_draw_rect(p->x + (p->width/2) - 1, p->y - 10, 2, 2, Green); // 感叹号的点
 
-            // 4. 检测按键：按下 F 键瞬间开启
-            if (key_F) {
+            // 4. 🌟 修改：检测按键，按下 J 键瞬间开启 (替换了 key_F)
+            if (key_J) {
                 cur_room->is_opened = 1;
                 // 可以在这里加入即时反馈，比如满血
                 p->current_hp = p->max_hp;

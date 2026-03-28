@@ -5,7 +5,8 @@
 extern int key_W;
 extern int key_A;
 extern int key_S;
-extern int key_F;
+extern int key_J; // 🌟 交互/开箱专用键！(已替换原本的 F 键)
+
 
 typedef struct {
     int x, y;           // 准星在屏幕上的绝对坐标

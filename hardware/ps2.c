@@ -4,7 +4,8 @@
 #define PS2_MOUSE_BASE 0xFF200108
 
 int key_W = 0, key_A = 0, key_S = 0, key_D = 0;
-int key_F = 0;
+int key_J = 0;
+
 MouseState mouse = {160, 120, 0}; // 初始位置屏幕中央
 
 static int kbd_break = 0;
@@ -31,7 +32,7 @@ void PS2_Update(void) {
             if (b == 0x1C) key_A = state;
             if (b == 0x1B) key_S = state;
             if (b == 0x23) key_D = state;
-            if (b == 0x2B) key_F = state;
+            if (b == 0x3B) key_J = state;
             kbd_break = 0;
         }
     }

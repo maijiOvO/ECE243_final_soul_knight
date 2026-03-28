@@ -84,8 +84,9 @@ int main(void) {
         Player_Update(knight, dx, dy);
         Weapon_Update(init_weapon, knight, &mouse);
 
-        Update_All_Enemies(knight->x, knight->y);
-
+        // 把 0 换成真实的键盘状态 key_J
+        Update_All_Enemies(knight->x, knight->y, key_J);     
+           
         // [C] 房间切换处理
         if (handle_room_transition(knight)) {
             // 切换房间后，强制同步两个Buffer的历史坐标，防止擦除错误
