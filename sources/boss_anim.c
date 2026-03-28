@@ -1,4 +1,4 @@
-#include "boss_idle_anim.h"
+#include "boss_anim.h"
 
 // boss_idel_01.bmp (160x128)
 static const unsigned char data_boss_idel_01[] = {
@@ -205145,7 +205145,8 @@ static const unsigned char data_boss_death_09[] = {
     
 };
 
-const MonsterFrame boss_death_frames[] = {
+// 把所有的 MonsterFrame 替换成 BossFrame，彻底解决重名冲突
+const BossFrame boss_death_frames[] = {
     {data_boss_death_01, 160, 128},
     {data_boss_death_02, 160, 128},
     {data_boss_death_03, 160, 128},
@@ -205157,8 +205158,7 @@ const MonsterFrame boss_death_frames[] = {
     {data_boss_death_09, 160, 128},
 };
 
-
-const MonsterFrame boss_hurt_frames[] = {
+const BossFrame boss_hurt_frames[] = {
     {data_boss_hurt_01, 160, 128},
     {data_boss_hurt_02, 160, 128},
     {data_boss_hurt_03, 160, 128},
@@ -205166,8 +205166,7 @@ const MonsterFrame boss_hurt_frames[] = {
     {data_boss_hurt_05, 160, 128},
 };
 
-
-const MonsterFrame boss_ultimate_frames[] = {
+const BossFrame boss_ultimate_frames[] = {
     {data_boss_ultimate_01, 160, 128},
     {data_boss_ultimate_02, 160, 128},
     {data_boss_ultimate_03, 160, 128},
@@ -205187,8 +205186,7 @@ const MonsterFrame boss_ultimate_frames[] = {
     {data_boss_ultimate_17, 160, 128},
 };
 
-
-const MonsterFrame boss_attack_frames[] = {
+const BossFrame boss_attack_frames[] = {
     {data_boss_attack_01, 160, 128},
     {data_boss_attack_02, 160, 128},
     {data_boss_attack_03, 160, 128},
@@ -205204,8 +205202,7 @@ const MonsterFrame boss_attack_frames[] = {
     {data_boss_attack_13, 160, 128},
 };
 
-
-const MonsterFrame boss_walk_frames[] = {
+const BossFrame boss_walk_frames[] = {
     {data_boss_walk_01, 160, 128},
     {data_boss_walk_02, 160, 128},
     {data_boss_walk_03, 160, 128},
@@ -205216,8 +205213,7 @@ const MonsterFrame boss_walk_frames[] = {
     {data_boss_walk_08, 160, 128},
 };
 
-
-const MonsterFrame boss_idle_frames[] = {
+const BossFrame boss_idle_frames[] = {
     {data_boss_idel_01, 160, 128},
     {data_boss_idel_02, 160, 128},
     {data_boss_idel_03, 160, 128},

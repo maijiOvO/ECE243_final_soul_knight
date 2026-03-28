@@ -53,5 +53,7 @@ extern int num_enemies;
 void Spawn_Enemies_For_Room(int rx, int ry);
 void Draw_All_Enemies();
 void Update_All_Enemies(int player_x, int player_y, int is_j_pressed);
+void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h);
+void Draw_Boss_FX();
 
 #endif

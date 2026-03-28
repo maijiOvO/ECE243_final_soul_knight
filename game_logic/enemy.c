@@ -390,6 +390,8 @@ void Enemy_Draw(Enemy *e) {
     }
     // 👇👇👇 🌟 补齐：亡灵法师图片数据挂载 🌟 👇👇👇
     else if (e->type == ENEMY_TYPE_NECRO) {
+        const BossFrame *f = NULL; // 🌟 关键修改：使用 BossFrame 而不是 MonsterFrame
+        
         if (e->state == 0) { current_image = boss_idle_frames[e->current_frame].data; draw_width = boss_idle_frames[e->current_frame].w; draw_height = boss_idle_frames[e->current_frame].h; }
         else if (e->state == 1) { current_image = boss_walk_frames[e->current_frame].data; draw_width = boss_walk_frames[e->current_frame].w; draw_height = boss_walk_frames[e->current_frame].h; }
         else if (e->state == 2) { current_image = boss_attack_frames[e->current_frame].data; draw_width = boss_attack_frames[e->current_frame].w; draw_height = boss_attack_frames[e->current_frame].h; }
@@ -553,11 +555,13 @@ void Draw_Boss_FX() {
         if (!boss_fx_list[i].active) continue;
         BossFX *fx = &boss_fx_list[i];
         const unsigned char *img = NULL;
-        if (fx->type == FX_TYPE_TORNADO) img = tornado_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_FIRE) img = fire_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_SMEAR) img = smear_frames[fx->anim_frame].data;
+
+        // 🌟 这里的数组名（如 tornado_frames）必须在 boss_attack_anim.h 里定义过
+        // 且它们的类型也应该是 BossFrame 或 MonsterFrame
+        if (fx->type == FX_TYPE_TORNADO) img = boss_tornado_frames[fx->anim_frame].data;
+        else if (fx->type == FX_TYPE_FIRE) img = boss_fire_frames[fx->anim_frame].data;
+        else if (fx->type == FX_TYPE_SMEAR) img = boss_smear_frames[fx->anim_frame].data;
         
         if (img) Draw_Transparent_Image(fx->x, fx->y, img, fx->width, fx->height);
     }
 }
-// 👆👆👆 🌟 补齐结束 🌟 👆👆👆

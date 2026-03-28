@@ -1,19 +1,12 @@
 #ifndef BOSS_ATTACK_ANIM_H
 #define BOSS_ATTACK_ANIM_H
 
-// 🌟 防撞护盾：如果前面已经定义过了，这块代码就会自动隐身！
-#ifndef MONSTER_FRAME_STRUCT_DEFINED
-#define MONSTER_FRAME_STRUCT_DEFINED
-typedef struct {
-    const unsigned char* data;
-    int w;
-    int h;
-} MonsterFrame;
-#endif
+// 🌟 核心修改：删掉这里错误的结构体定义，直接引入正确的头文件！
+#include "boss_anim.h"
 
-// 声明特效动作
-extern const MonsterFrame tornado_frames[];
-extern const MonsterFrame smear_frames[];
-extern const MonsterFrame fire_frames[];
+// 声明数组给 enemy.c 使用
+extern const BossFrame boss_tornado_frames[];
+extern const BossFrame boss_fire_frames[];
+extern const BossFrame boss_smear_frames[];
 
 #endif

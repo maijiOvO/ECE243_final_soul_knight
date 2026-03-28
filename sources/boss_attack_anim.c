@@ -2114,22 +2114,21 @@ static const unsigned char data_fire_04[] = {
     
 };
 
-const MonsterFrame fire_frames[] = {
+const BossFrame boss_fire_frames[] = {
     {data_fire_01, 32, 32},
     {data_fire_02, 32, 32},
     {data_fire_03, 32, 32},
     {data_fire_04, 32, 32},
 };
 
-
-const MonsterFrame smear_frames[] = {
+const BossFrame boss_smear_frames[] = {
     {data_smear_01, 32, 32},
     {data_smear_02, 32, 32},
     {data_smear_03, 32, 32},
     {data_smear_04, 32, 32},
 };
 
-const MonsterFrame tornado_frames[] = {
+const BossFrame boss_tornado_frames[] = {
     {data_tornado_01, 32, 32},
     {data_tornado_02, 32, 32},
     {data_tornado_03, 32, 32},
