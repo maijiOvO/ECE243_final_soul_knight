@@ -4,7 +4,7 @@
 
 #define PS2_KBD_BASE   0xFF200100
 // 🚨 临时修改：因为直接插板子，硬件把鼠标认成了 Port 0
-#define PS2_MOUSE_BASE 0xFF200100  // <--- 把末尾的 8 改成 0
+#define PS2_MOUSE_BASE 0xFF200108  // <--- 把末尾的 8 改成 0
 
 
 int key_W = 0, key_A = 0, key_S = 0, key_D = 0;

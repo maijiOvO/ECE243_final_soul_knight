@@ -122,14 +122,16 @@ void init_world_map() {
             
             // 为新房间生成种子
             RoomSeeds *s = &world_map[rx][ry].seeds;
-            s->num_clusters = rand() % 3 + 2;
+            s->num_clusters = (rand() % 2) + 3; 
             s->current_inner_texture = rand() % 5;
+            
             for (int k = 0; k < 4; k++) {
                 s->shape[k] = rand() % 5;
-                s->cx[k] = rand() % 3 + 2;
-                s->cy[k] = rand() % 4 + 3;
+                
+                // 🌟 优化 2：修改生成范围，避开边缘的 2！
+                s->cx[k] = (rand() % 3) + 3; // 生成 3, 4, 5 (完美避开 x=2)
+                s->cy[k] = (rand() % 4) + 3; // 生成 3, 4, 5, 6 (完美避开 y=2)
             }
-
             // 记录位置用于计算 Boss 房
             rooms_x[count] = rx;
             rooms_y[count] = ry;
@@ -178,6 +180,8 @@ void init_world_map() {
     
     // 正式册封 Boss 房
     world_map[rooms_x[boss_index]][rooms_y[boss_index]].type = 'B';
+
+    world_map[rooms_x[boss_index]][rooms_y[boss_index]].seeds.num_clusters = 0;
 
     // 6. 随机选一个不是起点也不是 Boss 的房间作为宝箱房
     if (count > 2) {
