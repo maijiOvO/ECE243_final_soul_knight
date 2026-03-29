@@ -31,7 +31,8 @@ typedef struct {
     int exists;
     int is_cleared; 
     int is_opened;   // 【新增】：专门标记宝箱是否被打开过
-    char type;       
+    char type;
+    int is_mimic; 
     RoomSeeds seeds;
 } Room;
 

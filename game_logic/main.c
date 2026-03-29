@@ -58,7 +58,7 @@ int main(void) {
         if (key_W || key_A || key_S || key_D) {
             break; 
         }
-        vga_wait_for_vsync(); // 🌟 加上这一句！踩住刹车，防止 CPU 瞬间跑飞！
+        vga_wait_for_vsync();
     }
     srand(random_seed); 
 
@@ -83,7 +83,7 @@ int main(void) {
 
         // [B] 逻辑更新
         Player_Update(knight, dx, dy);
-        Weapon_Update(init_weapon, knight, &mouse);
+        Weapon_Update(init_weapon, knight, &mouse, enemies, num_enemies);
 
         // 把 0 换成真实的键盘状态 key_J
         Update_All_Enemies(knight->x, knight->y, key_J);     
@@ -97,10 +97,21 @@ int main(void) {
             prev_mouse_y[0] = prev_mouse_y[1] = mouse.y;
         }
 
-        // [D] 渲染准备：清屏
-        // 注意：性能建议——如果 draw_walls 覆盖全图，不需要 clear_screen
-        // 但由于你有黑色背景，clear_screen() 是最稳妥的防残影方法
         Draw_Opaque_Image(0, 0, dungeon, 320, 240);
+
+        if (world_map[current_room_x][current_room_y].is_cleared == 0) {
+            
+            int alive_count = 0;//calculate current number of alive enemies
+            for (int i = 0; i < num_enemies; i++) {
+                if (enemies[i].alive) {
+                    alive_count++;
+                }
+            }
+            if (alive_count == 0) {
+                world_map[current_room_x][current_room_y].is_cleared = 1;
+                apply_doors_to_walls(); 
+            }
+        }
 
         // [E] 绘制世界
         draw_walls();
@@ -137,7 +148,7 @@ int main(void) {
         prev_mouse_x[current_buffer] = mouse.x;
         prev_mouse_y[current_buffer] = mouse.y;
 
-        if(knight -> current_hp > 10){knight -> current_hp --;}// for testing whether draws correct color
+        //if(knight -> current_hp > 10){knight -> current_hp --;}// for testing whether draws correct color
 
         // [H] 硬件同步与缓冲区翻转
         vga_wait_for_vsync(); 

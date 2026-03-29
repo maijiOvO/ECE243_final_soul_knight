@@ -6,6 +6,7 @@
 #include "player.h"
 #include "../hardware/ps2.h"
 #include <math.h>
+#include "enemy.h"
 
 #define MAX_BULLETS 15
 #define PI 3.14159265f
@@ -19,6 +20,8 @@ typedef struct {
     int vx_fp;        // X速度 * 256
     int vy_fp;        // Y速度 * 256
     bool active;
+
+    int damage;
     // prev用于双缓冲擦除
     int prev_x[2];    
     int prev_y[2];
@@ -52,7 +55,7 @@ void Weapon_Init(Weapon *w, int id);
 void Weapon_Draw(Weapon *w, Player *p);
 bool Weapon_Can_Shoot(Weapon *w); // 检查是否可以射击
 
-void Weapon_Update(Weapon *w, Player *p, MouseState *m); // 处理射击和子弹移动
+void Weapon_Update(Weapon *w, Player *p, MouseState *m, Enemy *enemies, int enemy_count);
 void Bullet_Draw(Weapon *w, int buffer_id); // 画出所有活动子弹
 void Bullet_Erase(Weapon *w, int buffer_id);
 

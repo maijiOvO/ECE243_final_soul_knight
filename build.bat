@@ -22,7 +22,7 @@ echo (Target: DE1-SoC RISC-V RV32)
 :: 核心编译命令
 :: 使用了 -O3 优化, -Wall 警告全开, -nostartfiles 使用自定义 start.s
 :: 使用 *.c 自动匹配子文件夹下所有源码
-riscv-none-elf-gcc -O3 -march=rv32imf_zicsr_zicbom -mabi=ilp32f -Wall -nostartfiles ^
+riscv-none-elf-gcc -O3 -march=rv32imf_zicsr_zicbom -mabi=ilp32f -nostartfiles ^
 start.s ^
 ./game_logic/*.c ^
 ./hardware/*.c ^

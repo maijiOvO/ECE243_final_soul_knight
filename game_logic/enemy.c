@@ -11,6 +11,7 @@
 #include "../sources/mimic_anim.h"  
 #include "../sources/boss_anim.h" 
 #include "../sources/boss_attack_anim.h" 
+#include "../sources/map_texture.h"
 
 // ==========================================
 // 🌟 1. 魔法特效应有尽有的定义区
@@ -365,9 +366,9 @@ void Enemy_Draw(Enemy *e) {
     else if (e->type == ENEMY_TYPE_MIMIC) {
         switch (e->state) {
             case MIMIC_STATE_STATIONARY:
-                current_image = mimic_stationary_frames[e->current_frame].data;
-                draw_width = mimic_stationary_frames[e->current_frame].w;
-                draw_height = mimic_stationary_frames[e->current_frame].h;
+                current_image = box[1];
+                draw_width = 20;
+                draw_height = 20;
                 break;
             case MIMIC_STATE_TRANSFORMING:
                 current_image = mimic_transformation_frames[e->current_frame].data;
@@ -389,9 +390,9 @@ void Enemy_Draw(Enemy *e) {
                 break;
         }
     }
-    // 👇👇👇 🌟 补齐：亡灵法师图片数据挂载 🌟 👇👇👇
+    // 补齐：亡灵法师图片数据挂载
     else if (e->type == ENEMY_TYPE_NECRO) {
-        const BossFrame *f = NULL; // 🌟 关键修改：使用 BossFrame 而不是 MonsterFrame
+        const BossFrame *f = NULL;
         
         if (e->state == 0) { current_image = boss_idle_frames[e->current_frame].data; draw_width = boss_idle_frames[e->current_frame].w; draw_height = boss_idle_frames[e->current_frame].h; }
         else if (e->state == 1) { current_image = boss_walk_frames[e->current_frame].data; draw_width = boss_walk_frames[e->current_frame].w; draw_height = boss_walk_frames[e->current_frame].h; }
@@ -399,14 +400,12 @@ void Enemy_Draw(Enemy *e) {
         else if (e->state == 3) { current_image = boss_attack_frames[e->current_frame].data; draw_width = boss_attack_frames[e->current_frame].w; draw_height = boss_attack_frames[e->current_frame].h; }
         else if (e->state == 4) { current_image = boss_ultimate_frames[e->current_frame].data; draw_width = boss_ultimate_frames[e->current_frame].w; draw_height = boss_ultimate_frames[e->current_frame].h; }
     }
-    // 👆👆👆 🌟 补齐结束 🌟 👆👆👆
     else {
         current_image = zombie_anim[e->current_frame];
     }
 
     if (current_image == NULL) return;
 
-    // 🌟 终极修复：中心点对齐法
     int center_x = e->x + 16;
     int center_y = e->y + 16;
     int draw_x = center_x - (draw_width / 2);
@@ -419,26 +418,45 @@ void Enemy_Draw(Enemy *e) {
     }
 }
 
-// =====================================
-// 管家系统：给外部调用
-// =====================================
+
 void Spawn_Enemies_For_Room(int rx, int ry) {
     num_enemies = 0; 
 
+    // 1. 绝对安全区：出生点和宝箱房不刷怪
     if (rx == 6 && ry == 6) return; 
-    if (world_map[rx][ry].type == 'C') return; 
+    if (world_map[rx][ry].type == 'C' && world_map[rx][ry].is_mimic == 0) return; 
+    // 只有当房间被清理过，并且宝箱/宝箱怪被触发过，才彻底不刷怪
+    if (world_map[rx][ry].is_cleared == 1 || world_map[rx][ry].is_opened == 1) {
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            enemies[i].alive = 0; 
+        }
+        return; 
+    }
 
+    // 2. 房间分配逻辑 确保boss只刷在boss房里
     if (room_assigned_type[rx][ry] == 0) {
-        rooms_explored_count++; 
-        
-        if (rooms_explored_count == 1) room_assigned_type[rx][ry] = 1; 
-        else if (rooms_explored_count == 2) room_assigned_type[rx][ry] = 2; 
-        else if (rooms_explored_count == 3) room_assigned_type[rx][ry] = 4; 
-        else if (rooms_explored_count == 4) room_assigned_type[rx][ry] = 5; 
-        // 👇👇👇 🌟 补齐：给第五个房间盖章 🌟 👇👇👇
-        else if (rooms_explored_count == 5) room_assigned_type[rx][ry] = 6; 
-        // 👆👆👆 🌟 补齐结束 🌟 👆👆👆
-        else room_assigned_type[rx][ry] = 3; 
+        if (world_map[rx][ry].type == 'B') {
+            // 如果大地图标记这里是 Boss 房，无视探索顺序，强行盖上 Boss 印章 (6)
+            room_assigned_type[rx][ry] = 6; 
+        } 
+        else {
+            // 否则就是普通怪物房 (type == 'M')，按照玩家探索的顺序循序渐进地给压力
+            rooms_explored_count++; 
+            
+            if (rooms_explored_count == 1) room_assigned_type[rx][ry] = 1;      // 第1间：僵尸
+            else if (rooms_explored_count == 2) room_assigned_type[rx][ry] = 2; // 第2间：弗兰肯斯坦
+            else if (rooms_explored_count == 3) room_assigned_type[rx][ry] = 4; // 第3间：哥布林炸弹人
+            else if (rooms_explored_count == 4){
+                room_assigned_type[rx][ry] = 5;
+                world_map[rx][ry].is_mimic = 1;     // 标记为伪装
+                world_map[rx][ry].type = 'C';       // 小地图图标变成宝箱
+                world_map[rx][ry].is_cleared = 1;   // 强制设为已清空，让大门保持敞开！
+                world_map[rx][ry].is_opened = 0;    // 宝箱处于未开启状态
+                world_map[rx][ry].seeds.num_clusters = 0; // 强制清空掩体，变成空旷大厅
+            } // 第4间：宝箱怪 (伪装)
+            
+            else room_assigned_type[rx][ry] = 3; // 第5间及以后：空房间
+        }
     }
 
     int type = room_assigned_type[rx][ry];
@@ -448,7 +466,7 @@ void Spawn_Enemies_For_Room(int rx, int ry) {
     else if (type == 2) count = 6;  
     else if (type == 4) count = 30; 
     else if (type == 5) count = 1;  
-    else if (type == 6) count = 1;  // 🌟 Boss 只有一个
+    else if (type == 6) count = 1;  //Boss 只有一个
     else if (type == 3) count = 0;  
 
     for (int i = 0; i < count; i++) {
@@ -521,7 +539,6 @@ void Draw_All_Enemies() {
     }
 }
 
-// 👇👇👇 🌟 补齐：完全缺失的魔法物理与渲染引擎 🌟 👇👇👇
 void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h) {
     for (int i = 0; i < MAX_BOSS_FX; i++) {
         if (!boss_fx_list[i].active) continue;

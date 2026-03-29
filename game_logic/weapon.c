@@ -30,7 +30,15 @@ void Bullet_Erase(Weapon *w, int buffer_id) {
     }
 }
 
-void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
+bool check_overlap(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+    if (x1 + w1 <= x2) return false;
+    if (x2 + w2 <= x1) return false;
+    if (y1 + h1 <= y2) return false;
+    if (y2 + h2 <= y1) return false;
+    return true;
+}
+
+void Weapon_Update(Weapon *w, Player *p, MouseState *m, Enemy *enemies, int enemy_count) {
     // 1. 视觉效果：决定武器贴图索引 (每帧执行一次 atan2f 性能开销极小)
     int dx = m->x - (p->x + 16);
     int dy = m->y - (p->y + 16);
@@ -49,6 +57,8 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
                 if (dist_sq == 0) dist_sq = 1;
                 uint32_t L = isqrt(dist_sq);
 
+                w->bullets[i].damage = w->damage;// give the damage to bullet
+
                 // 发射子弹：Vx = (speed * dx * 256) / L
                 w->bullets[i].active = true;
                 w->bullets[i].vx_fp = (w->bullet_speed * dx << FP_SHIFT) / (int)L;
@@ -64,21 +74,59 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
         }
     }
 
-    // 3. 子弹物理更新：纯整数运算
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (w->bullets[i].active) {
             w->bullets[i].x_fp += w->bullets[i].vx_fp;
             w->bullets[i].y_fp += w->bullets[i].vy_fp;
 
+            // 定点数转回真实像素坐标
             int real_x = w->bullets[i].x_fp >> FP_SHIFT;
             int real_y = w->bullets[i].y_fp >> FP_SHIFT;
 
-            // 碰撞检测与边界检查
-            if (can_move_to(real_x, real_y, 4, 4) && 
-                real_x > 0 && real_x < 320 && real_y > 0 && real_y < 240) {
-                // 正常飞行，无需额外动作
-            } else {
-                w->bullets[i].active = false; // 撞墙或出界消失
+            // A. 查环境（撞墙检测）
+            // 假设子弹是一个 4x4 的小方块
+            if (!can_move_to(real_x, real_y, 4, 4) || 
+                real_x <= 0 || real_x >= 320 || real_y <= 0 || real_y >= 240) {
+                w->bullets[i].active = false; // 撞墙碎裂
+                continue; // 这颗子弹没了，直接跳过后面的怪物检测
+            }
+
+            // B. 查实体（打怪检测）
+            bool hit_enemy = false;
+            for (int e = 0; e < enemy_count; e++) {
+                if (enemies[e].alive) {
+                    // 假设怪物的物理碰撞箱稍微比贴图小一点，手感更好
+                    // 这里假设怪物也是 32x32，碰撞箱取中心 24x24
+                    int enemy_hit_x = enemies[e].x + 4;
+                    int enemy_hit_y = enemies[e].y + 4;
+                    int enemy_hit_w = 24;
+                    int enemy_hit_h = 24;
+
+                    // AABB 碰撞判定！
+                    if (check_overlap(real_x, real_y, 4, 4, enemy_hit_x, enemy_hit_y, enemy_hit_w, enemy_hit_h)) {
+                        // 命中！
+                        hit_enemy = true;
+                        
+                        //伤害结算
+                        enemies[e].hp -= w->bullets[i].damage;
+                        
+                        //受击反馈标记 (让怪物在绘制时闪烁白光或红光)
+                        //enemies[e].hit_timer = 5; // 闪烁 5 帧
+                        
+                        //死亡判定
+                        if (enemies[e].hp <= 0) {
+                            enemies[e].alive = false;
+                            // 这里未来可以触发金币掉落或爆炸特效
+                        }
+                        
+                        break; // 假设子弹不能穿透，打中一只怪就停止遍历
+                    }
+                }
+            }
+
+            // 如果打中怪了，子弹也要销毁
+            if (hit_enemy) {
+                w->bullets[i].active = false;
             }
         }
     }

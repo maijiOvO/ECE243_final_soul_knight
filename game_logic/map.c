@@ -52,7 +52,9 @@ void handle_chest_interaction(Player *p) {
             if (key_J) {
                 cur_room->is_opened = 1;
                 // 可以在这里加入即时反馈，比如满血
-                p->current_hp = p->max_hp;
+                if((cur_room ->is_mimic) ==  0){
+                    p->current_hp = p->max_hp;
+                }
             }
         }
     }
@@ -61,7 +63,7 @@ void handle_chest_interaction(Player *p) {
 void draw_room_objects() {
     Room cur = world_map[current_room_x][current_room_y];
 
-    if (cur.type == 'C') {
+    if (cur.type == 'C' && cur.is_mimic == 0) {
         // 宝箱位置固定在 (160, 120)
         if (cur.is_opened) {
             // 画开启后的贴图 box[0]
@@ -114,8 +116,9 @@ void init_world_map() {
 
         if (world_map[rx][ry].exists == 0) {
             world_map[rx][ry].exists = 1;
-            world_map[rx][ry].is_cleared = 1; // 调试期全开，后期改为 0
+            world_map[rx][ry].is_cleared = 0; // 调试期全开，后期改为 0
             world_map[rx][ry].type = 'M';    // Monster
+            world_map[rx][ry].is_mimic = 0;
             
             // 为新房间生成种子
             RoomSeeds *s = &world_map[rx][ry].seeds;
@@ -135,20 +138,51 @@ void init_world_map() {
     }
 
     // 5. 寻找最远点作为 Boss 房
-    int max_dist = -1, boss_idx = -1;
+    int max_dist = -1;
+    int boss_index = -1;
+
     for (int i = 1; i < count; i++) {
-        int dist = abs(rooms_x[i] - 6) + abs(rooms_y[i] - 6);
-        if (dist > max_dist) {
-            max_dist = dist;
-            boss_idx = i;
+        int cx = rooms_x[i];
+        int cy = rooms_y[i];
+
+        // 1. 探测四周，计算该房间有几个邻居（即有几扇门）
+        int neighbors = 0;
+        if (world_map[cx - 1][cy].exists) neighbors++;
+        if (world_map[cx + 1][cy].exists) neighbors++;
+        if (world_map[cx][cy - 1].exists) neighbors++;
+        if (world_map[cx][cy + 1].exists) neighbors++;
+
+        // 2. 【核心规则】：只有邻居数为 1（死胡同），才有资格成为 Boss 房！
+        if (neighbors == 1) {
+            int dist = abs(cx - 6) + abs(cy - 6);
+            if (dist > max_dist) {
+                max_dist = dist;
+                boss_index = i;
+            }
         }
     }
-    if (boss_idx != -1) world_map[rooms_x[boss_idx]][rooms_y[boss_idx]].type = 'B';
+
+    // 3. 【极小概率兜底方案】
+    // 万一随机算法走成了一个完美的“贪吃蛇闭环”（完全没有死胡同怎么办？）
+    // 为了防止游戏崩溃，我们退回到老办法：直接挑一个最远的房间。
+    if (boss_index == -1) {
+        max_dist = -1;
+        for (int i = 1; i < count; i++) {
+            int dist = abs(rooms_x[i] - 6) + abs(rooms_y[i] - 6);
+            if (dist > max_dist) {
+                max_dist = dist;
+                boss_index = i;
+            }
+        }
+    }
+    
+    // 正式册封 Boss 房
+    world_map[rooms_x[boss_index]][rooms_y[boss_index]].type = 'B';
 
     // 6. 随机选一个不是起点也不是 Boss 的房间作为宝箱房
     if (count > 2) {
         int c_idx;
-        do { c_idx = rand() % count; } while (c_idx == 0 || c_idx == boss_idx);
+        do { c_idx = rand() % count; } while (c_idx == 0 || c_idx == boss_index);
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].type = 'C';
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].is_cleared = 1;
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].seeds.num_clusters = 0;
@@ -156,6 +190,10 @@ void init_world_map() {
 }
 
 void apply_doors_to_walls() {       // the position of walls
+
+    if (world_map[current_room_x][current_room_y].is_cleared == 0 && world_map[current_room_x][current_room_y].is_mimic == 0) {
+        return; 
+    }
 
     // 检查上方：如果北边有房间，挖开顶部中间
     if (world_map[current_room_x][current_room_y - 1].exists) {
@@ -180,24 +218,24 @@ int handle_room_transition(Player *p) { // return 1 if jumped
 
     // 检测四个边缘
     if (p->y < -5) {
-        current_room_y--; p->y = 204; teleported = 1;
+        current_room_y--; p->y = 184; teleported = 1;
     } else if (p->y > 205) {
-        current_room_y++; p->y = 10;  teleported = 1;
+        current_room_y++; p->y = 30;  teleported = 1;
     } else if (p->x < -5) {
-        current_room_x--; p->x = 285; teleported = 1;
+        current_room_x--; p->x = 265; teleported = 1;
     } else if (p->x > 286) {
-        current_room_x++; p->x = 10;  teleported = 1;
+        current_room_x++; p->x = 30;  teleported = 1;
     }
 
     if (teleported) {
         init_walls();
+        // 在这里刷怪！把刚刚算好的新房间坐标传进去
+        Spawn_Enemies_For_Room(current_room_x, current_room_y);
         apply_doors_to_walls();
+
         clear_screen(); 
         vga_wait_for_vsync(); 
         clear_screen(); 
-        
-        // 在这里刷怪！把刚刚算好的新房间坐标传进去
-        Spawn_Enemies_For_Room(current_room_x, current_room_y);
     }
 
     return teleported;
@@ -242,18 +280,16 @@ void draw_world_map() {
                     }
                 }
                 else if (type == 'C'){//chest room
-                    //color = 0xFFE0;
                     if (draw_x >= 0 && draw_y >= 0) {
                         vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
-                        if(world_map[current_room_x][current_room_y].is_opened){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[2], 8, 8);}
+                        if(world_map[i][j].is_opened){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[2], 8, 8);}
                         else{Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[1], 8, 8);}
                     }
                 } 
-                else {
-                    //color = Blue;
+                else {//common rooms
                     if (draw_x >= 0 && draw_y >= 0) {
                         vga_draw_rect(draw_x, draw_y, room_size, room_size, color);
-                        if(world_map[current_room_x][current_room_y].is_cleared){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[3], 8, 8);}
+                        if(world_map[i][j].is_cleared){Draw_Transparent_Image(draw_x + 1, draw_y + 1, map_icon[3], 8, 8);}
                         else {Draw_Transparent_Image(draw_x, draw_y, map_icon[5], 8, 8);}
                     }
                 }
@@ -332,7 +368,7 @@ void init_walls() {
             walls[15 - x][11 - y] = walls[x][y]; 
         }
     }
-    apply_doors_to_walls();
+    if(world_map[current_room_x][current_room_y].is_cleared == 1) apply_doors_to_walls();
 }
 
 void draw_walls(){
