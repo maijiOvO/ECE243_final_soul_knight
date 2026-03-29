@@ -416,6 +416,34 @@ void Enemy_Draw(Enemy *e) {
     } else {
         Draw_Transparent_Image(draw_x, draw_y, current_image, draw_width, draw_height);
     }
+
+    if (e->type == ENEMY_TYPE_NECRO && e->alive) {
+        int bar_w = 40;  // 血条的总宽度
+        int bar_h = 4;   // 血条的高度
+        int bar_x = center_x - (bar_w / 2);
+        int bar_y = draw_y - 10; // 画在 Boss 头顶上方 10 像素的位置
+
+        // 防止血量变负数导致画图错乱
+        int hp_to_draw = e->hp;
+        if (hp_to_draw < 0) hp_to_draw = 0;
+
+        // 计算绿色当前血量的长度比例
+        int green_w = (hp_to_draw * bar_w) / e->max_hp;
+
+        // 1. 先画纯红色底色（代表损失的血量）
+        for (int i = 0; i < bar_h; i++) {
+            for (int j = 0; j < bar_w; j++) {
+                plot_pixel(bar_x + j, bar_y + i, 0xF800); 
+            }
+        }
+        
+        // 2. 再画纯绿色前景（代表剩余血量）
+        for (int i = 0; i < bar_h; i++) {
+            for (int j = 0; j < green_w; j++) {
+                plot_pixel(bar_x + j, bar_y + i, 0x07E0); 
+            }
+        }
+    }
 }
 
 
@@ -540,6 +568,7 @@ void Draw_All_Enemies() {
 }
 
 void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h) {
+    extern Player knight_entity;
     for (int i = 0; i < MAX_BOSS_FX; i++) {
         if (!boss_fx_list[i].active) continue;
         BossFX *fx = &boss_fx_list[i];
@@ -559,7 +588,17 @@ void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h) {
 
         int hit_knight = (fx->x < knight_x + knight_w && fx->x + fx->width > knight_x && fx->y < knight_y + knight_h && fx->y + fx->height > knight_y);
         if (hit_knight) {
-            // TODO: 这里可以加上骑士扣血的代码！
+            // 如果骑士不在无敌状态，才扣血
+            if (knight_entity.invincibility_timer <= 0) {
+                if (fx->type == FX_TYPE_TORNADO) knight_entity.current_hp -= 5;
+                else if (fx->type == FX_TYPE_SMEAR) knight_entity.current_hp -= 10;
+                else if (fx->type == FX_TYPE_FIRE) knight_entity.current_hp -= 2; 
+                
+                // 触发 60 帧 (1秒) 的无敌时间，防止被连续扣血
+                knight_entity.invincibility_timer = 60; 
+            }
+
+            // 龙卷风和斩击打中人后就消失（火墙保留）
             if (fx->type != FX_TYPE_FIRE) fx->active = 0; 
         }
 
