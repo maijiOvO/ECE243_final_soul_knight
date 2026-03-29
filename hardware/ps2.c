@@ -1,7 +1,11 @@
 #include "ps2.h"
 
+// 在 ps2.c 或 ps2.h 的顶部修改：
+
 #define PS2_KBD_BASE   0xFF200100
-#define PS2_MOUSE_BASE 0xFF200108
+// 🚨 临时修改：因为直接插板子，硬件把鼠标认成了 Port 0
+#define PS2_MOUSE_BASE 0xFF200100  // <--- 把末尾的 8 改成 0
+
 
 int key_W = 0, key_A = 0, key_S = 0, key_D = 0;
 int key_J = 0;
@@ -14,8 +18,10 @@ static unsigned char mouse_packet[3];
 
 void PS2_Init(void) {
     volatile int *mouse_ptr = (int *)PS2_MOUSE_BASE;
-    // 发送使能指令 0xF4 让鼠标开始工作
-    *mouse_ptr = 0xF4; 
+    // 🌟 修改这里：增加一个 while 循环，等待 WSPACE (写空间) 有空余
+    // 只有当高 16 位大于 0 时，才能往里写数据
+    while (((*(mouse_ptr + 1)) & 0xFFFF0000) == 0); 
+    *mouse_ptr = 0xF4; // 告诉鼠标：开始发送数据！
 }
 
 void PS2_Update(void) {
@@ -52,13 +58,16 @@ void PS2_Update(void) {
         if (mouse_phase == 3) {
             mouse_phase = 0;
             mouse.left_click = mouse_packet[0] & 0x01;
-            // 补码转换位移
+            
             signed char dx = (signed char)mouse_packet[1];
             signed char dy = (signed char)mouse_packet[2];
+            
             mouse.x += dx;
-            mouse.y += dy; // 屏幕 Y 轴向下，PS/2 向上为正
+            // 🌟 修改这里：把 += 改成 -=
+            // 因为屏幕的 Y 轴是往下增长的，而物理鼠标往前推 dy 是正数
+            mouse.y -= dy; 
 
-            // 边界限制
+            // 边界限制保持你的原样就好
             if (mouse.x < 0) mouse.x = 0; if (mouse.x > 319) mouse.x = 319;
             if (mouse.y < 0) mouse.y = 0; if (mouse.y > 239) mouse.y = 239;
         }
