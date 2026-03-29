@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>           // 🌟 新增：用于计算宝箱怪的距离
 #include "map.h"
+#include "player.h"  // 🌟 新增：让系统认识骑士，为了后面扣血
 #include "../hardware/vga.h"
 #include "../sources/zombie_anim.h" 
 #include "../sources/frankie_anim.h" 
@@ -554,14 +555,18 @@ void Draw_Boss_FX() {
     for (int i = 0; i < MAX_BOSS_FX; i++) {
         if (!boss_fx_list[i].active) continue;
         BossFX *fx = &boss_fx_list[i];
-        const unsigned char *img = NULL;
-
-        // 🌟 这里的数组名（如 tornado_frames）必须在 boss_attack_anim.h 里定义过
-        // 且它们的类型也应该是 BossFrame 或 MonsterFrame
-        if (fx->type == FX_TYPE_TORNADO) img = boss_tornado_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_FIRE) img = boss_fire_frames[fx->anim_frame].data;
-        else if (fx->type == FX_TYPE_SMEAR) img = boss_smear_frames[fx->anim_frame].data;
         
-        if (img) Draw_Transparent_Image(fx->x, fx->y, img, fx->width, fx->height);
+        const BossFrame *f = NULL; // 🌟 像画 Boss 一样，先用指针定位！
+
+        // 1. 根据魔法类型，找到对应的动画帧数据
+        if      (fx->type == FX_TYPE_TORNADO) f = &boss_tornado_frames[fx->anim_frame];
+        else if (fx->type == FX_TYPE_FIRE)    f = &boss_fire_frames[fx->anim_frame];
+        else if (fx->type == FX_TYPE_SMEAR)   f = &boss_smear_frames[fx->anim_frame];
+        
+        // 2. 只要找到了，就提取 data 并画出来
+        if (f != NULL) {
+            // 如果你的魔法特效每一帧大小都不一样，你甚至可以把 fx->width 换成 f->w
+            Draw_Transparent_Image(fx->x, fx->y, f->data, fx->width, fx->height);
+        }
     }
 }

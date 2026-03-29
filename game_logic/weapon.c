@@ -23,15 +23,13 @@ uint32_t isqrt(uint32_t n) {
 
 void Bullet_Erase(Weapon *w, int buffer_id) {
     for (int i = 0; i < MAX_BULLETS; i++) {
-        if (w->bullets[i].active) {
-            // 用黑色方块覆盖该子弹在这个 Buffer 上的旧位置
-            // 假设子弹大小是 4x4
-            vga_draw_rect(w->bullets[i].prev_x[buffer_id], 
-                          w->bullets[i].prev_y[buffer_id], 
-                          10, 10, Black);
-        }
+        // 只要上次在这个 buffer 画过，就得擦掉
+        vga_draw_rect(w->bullets[i].prev_x[buffer_id], 
+                      w->bullets[i].prev_y[buffer_id], 
+                      10, 10, Black);
     }
 }
+
 void Weapon_Update(Weapon *w, Player *p, MouseState *m) {
     // 1. 视觉效果：决定武器贴图索引 (每帧执行一次 atan2f 性能开销极小)
     int dx = m->x - (p->x + 16);

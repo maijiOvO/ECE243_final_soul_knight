@@ -16,6 +16,8 @@ typedef struct Player {
     int max_hp;
     int current_hp;
 
+    int invincibility_timer; // 🌟 新增：受击后的无敌时间倒计时
+
     int current_frame;
     int anim_tick;
     int anim_speed;

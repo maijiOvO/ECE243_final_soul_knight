@@ -1,6 +1,7 @@
 #include "player.h"
 #include "../hardware/vga.h" // 需要用到画图函数
 #include "map.h"
+#include "enemy.h" // 🌟 新增：必须引入敌人的头文件，不然系统不认识怪物
 
 // 初始化玩家
 void Player_Init(Player *p, int start_x, int start_y) {
@@ -14,6 +15,8 @@ void Player_Init(Player *p, int start_x, int start_y) {
     p->max_hp = 100;      // 总血量 100
     p->current_hp = 100;  // 初始满血
 
+    p->invincibility_timer = 0; // 🌟 新增：刚出生时没有无敌状态
+
     p->current_frame = 0;
     p->anim_tick = 0;
     p->anim_speed = 6;   // 60Hz 下，每 6 帧切一张图 (10 FPS 动画)
@@ -21,6 +24,7 @@ void Player_Init(Player *p, int start_x, int start_y) {
     p->is_moving = 0;
 }
 
+// 玩家状态更新 (这个函数被 main 函数以严格的 60Hz 频率调用)
 // 玩家状态更新 (这个函数被 main 函数以严格的 60Hz 频率调用)
 void Player_Update(Player *p, int move_dx, int move_dy) {
 
@@ -58,7 +62,6 @@ void Player_Update(Player *p, int move_dx, int move_dy) {
         p->is_moving = 0;
     }
 
-
     // logic for character animations
     //===================================
     // 4. 【动画状态切换逻辑】
@@ -93,6 +96,50 @@ void Player_Update(Player *p, int move_dx, int move_dy) {
             p->anim_tick = 0;
         }
     }
+    
+
+    if (p->invincibility_timer > 0) {
+        p->invincibility_timer--; // 如果还在无敌状态，计时器递减，期间不扣血
+    } 
+    else {
+        // 声明外部的怪物数组 (从 enemy.c 借过来用)
+        extern Enemy enemies[];
+        extern int num_enemies;
+
+        // 遍历所有活着的怪物，看看有没有碰到玩家
+        for (int i = 0; i < num_enemies; i++) {
+            if (enemies[i].alive) {
+                // AABB 矩形碰撞检测 (判断玩家边缘和怪物边缘是否重合)
+                int hit = (p->x < enemies[i].x + enemies[i].width &&
+                           p->x + p->width > enemies[i].x &&
+                           p->y < enemies[i].y + enemies[i].height &&
+                           p->y + p->height > enemies[i].y);
+
+                if (hit) {
+                    // 🩸 碰到怪物了！根据怪物种类扣除不同的血量：
+                    if (enemies[i].type == ENEMY_TYPE_FRANKIE) {
+                        p->current_hp -= 15; // 大块头撞人很痛，扣 15 滴
+                    } 
+                    else if (enemies[i].type == ENEMY_TYPE_MIMIC) {
+                        p->current_hp -= 20; // 宝箱怪咬人极痛，扣 20 滴
+                    } 
+                    else if (enemies[i].type == ENEMY_TYPE_NECRO) {
+                        p->current_hp -= 10; // 碰到 Boss 身体，扣 10 滴
+                    } 
+                    else {
+                        p->current_hp -= 5;  // 默认（比如普通僵尸、哥布林），扣 5 滴
+                    }
+
+                    // 🛡️ 触发无敌帧保护！设为 60 帧 (即 1 秒内不会再次受伤)
+                    p->invincibility_timer = 60; 
+                    
+                    // 被打了一下立刻跳出循环，防止同时被几只怪叠在一起瞬间秒杀
+                    break; 
+                }
+            }
+        }
+    }
+    //
 }
 
 void Player_Draw(Player *p) {
