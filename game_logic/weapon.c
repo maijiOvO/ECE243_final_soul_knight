@@ -5,7 +5,6 @@
 #include "../hardware/ps2.h"
 #include "../sources/weapon_texture.h"
 #include "player.h"
-#include <math.h> // 仅用于 atan2f 决定武器贴图
 
 //  quick sqrt
 uint32_t isqrt(uint32_t n) {
@@ -19,6 +18,43 @@ uint32_t isqrt(uint32_t n) {
         bit >>= 2;
     }
     return root;
+}
+
+static int get_dir_index_16(int dx, int dy) {
+    int adx = (dx < 0) ? -dx : dx;
+    int ady = (dy < 0) ? -dy : dy;
+
+    if (adx == 0 && ady == 0) return 0;
+
+    // 用斜率近似分成每个象限 4 段，共 16 方向
+    // 比例阈值大致对应 22.5° 和 67.5°
+    int t1 = adx * 2;
+    int t2 = ady * 5;
+
+    if (dx >= 0 && dy <= 0) { // 右上象限
+        if (t2 <= adx) return 0;       // 右
+        if (ady <= adx) return 1;      // 右上偏右
+        if (t1 <= ady) return 3;       // 上
+        return 2;                      // 右上偏上
+    }
+    else if (dx < 0 && dy <= 0) { // 左上象限
+        if (t2 <= adx) return 8;       // 左
+        if (ady <= adx) return 7;      // 左上偏左
+        if (t1 <= ady) return 5;       // 上
+        return 6;                      // 左上偏上
+    }
+    else if (dx < 0 && dy > 0) { // 左下象限
+        if (t2 <= adx) return 8;       // 左
+        if (ady <= adx) return 9;      // 左下偏左
+        if (t1 <= ady) return 11;      // 下
+        return 10;                     // 左下偏下
+    }
+    else { // dx >= 0 && dy > 0, 右下象限
+        if (t2 <= adx) return 0;       // 右
+        if (ady <= adx) return 15;     // 右下偏右
+        if (t1 <= ady) return 13;      // 下
+        return 14;                     // 右下偏下
+    }
 }
 
 void Bullet_Erase(Weapon *w, int buffer_id) {
@@ -42,9 +78,7 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m, Enemy *enemies, int enem
     // 1. 视觉效果：决定武器贴图索引 (每帧执行一次 atan2f 性能开销极小)
     int dx = m->x - (p->x + 16);
     int dy = m->y - (p->y + 16);
-    float angle = atan2f((float)dy, (float)dx);
-    if (angle < 0) angle += 6.283185f; // 2*PI
-    w->current_dir_index = (int)((angle / 6.283185f) * 16.0f + 0.5f) % 16;
+    w->current_dir_index = get_dir_index_16(dx, dy);
 
     // 2. 射击逻辑：高精度向量计算
     if (w->cooldown_timer > 0) w->cooldown_timer--;
@@ -110,13 +144,33 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m, Enemy *enemies, int enem
                         //伤害结算
                         enemies[e].hp -= w->bullets[i].damage;
                         
-                        //受击反馈标记 (让怪物在绘制时闪烁白光或红光)
-                        //enemies[e].hit_timer = 5; // 闪烁 5 帧
-                        
-                        //死亡判定
-                        if (enemies[e].hp <= 0) {
-                            enemies[e].alive = false;
-                            // 这里未来可以触发金币掉落或爆炸特效
+                       if (enemies[e].type == ENEMY_TYPE_NECRO) {
+                            // --- 处理 Boss ---
+                            if (enemies[e].hp <= 0) {
+                                // 1. Boss 死亡：不设为 alive = false，而是切状态 6
+                                if (enemies[e].state != 6) {
+                                    enemies[e].state = 6;
+                                    enemies[e].current_frame = 0;
+                                    enemies[e].anim_tick = 0;
+                                    enemies[e].dir_x = 0; // 停下脚步
+                                    enemies[e].dir_y = 0;
+                                }
+                            } else {
+                                // 2. Boss 受伤：还没死，切状态 5
+                                if (enemies[e].state != 6 && enemies[e].state != 5) {
+                                    enemies[e].state = 5;
+                                    enemies[e].current_frame = 0;
+                                    enemies[e].anim_tick = 0;
+                                    enemies[e].dir_x = 0; // 停下脚步挨打
+                                    enemies[e].dir_y = 0;
+                                }
+                            }
+                        } else {
+                            // --- 处理其他普通怪物 ---
+                            if (enemies[e].hp <= 0) {
+                                // 普通怪物血扣光了直接死亡消失
+                                enemies[e].alive = false;
+                            }
                         }
                         
                         break; // 假设子弹不能穿透，打中一只怪就停止遍历

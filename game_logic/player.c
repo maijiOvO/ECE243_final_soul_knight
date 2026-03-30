@@ -3,11 +3,12 @@
 #include "map.h"
 #include "enemy.h" // 🌟 新增：必须引入敌人的头文件，不然系统不认识怪物
 
+
 // 初始化玩家
 void Player_Init(Player *p, int start_x, int start_y) {
     p->x = start_x;
     p->y = start_y;
-    p->speed = 3;        // 每帧移动 3 个像素
+    p->speed = 4;        // 每帧移动 3 个像素
     p->dir = 0;
     p->height = 32;
     p->width = 32;

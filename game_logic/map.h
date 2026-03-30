@@ -34,6 +34,10 @@ typedef struct {
     char type;
     int is_mimic; 
     RoomSeeds seeds;
+
+    // 👇👇 新增：技能奖励相关 👇👇
+    int spawned_skills[3]; // 用来存抽到的 3 个技能的编号 (0到3)
+    int skills_picked;     // 标记玩家是否已经捡过了 (0没捡，1捡了)
 } Room;
 
 extern Room world_map[world_map_max][world_map_max];

@@ -1,5 +1,5 @@
 #include "map.h"
-#include <stdlib.h>
+#include "random.h"
 #include "../hardware/vga.h"
 #include "../hardware/ps2.h"
 #include "../sources/knight_anim.h"
@@ -35,8 +35,10 @@ void handle_chest_interaction(Player *p) {
     int player_center_x = p->x + (p->width / 2);
     int player_center_y = p->y + (p->height / 2);
 
-    int dist_x = abs(player_center_x - chest_center_x);
-    int dist_y = abs(player_center_y - chest_center_y);
+    int dx = player_center_x - chest_center_x;
+    int dy = player_center_y - chest_center_y;
+    int dist_x = (dx < 0) ? -dx : dx;
+    int dist_y = (dy < 0) ? -dy : dy;
 
     // 3. 判定范围：如果距离宝箱小于 35 像素
     if (dist_x < 35 && dist_y < 35) {
@@ -103,7 +105,7 @@ void init_world_map() {
     // 4. 随机漫步
     int rx = 6, ry = 6;
     while(count < max_rooms) {
-        int dir = rand() % 4;
+        int dir = my_rand() % 4;
         if      (dir == 0) ry--;
         else if (dir == 1) ry++;
         else if (dir == 2) rx--;
@@ -122,15 +124,15 @@ void init_world_map() {
             
             // 为新房间生成种子
             RoomSeeds *s = &world_map[rx][ry].seeds;
-            s->num_clusters = (rand() % 2) + 3; 
-            s->current_inner_texture = rand() % 5;
+            s->num_clusters = (my_rand() % 2) + 3; 
+            s->current_inner_texture = my_rand() % 5;
             
             for (int k = 0; k < 4; k++) {
-                s->shape[k] = rand() % 5;
+                s->shape[k] = my_rand() % 5;
                 
                 // 🌟 优化 2：修改生成范围，避开边缘的 2！
-                s->cx[k] = (rand() % 3) + 3; // 生成 3, 4, 5 (完美避开 x=2)
-                s->cy[k] = (rand() % 4) + 3; // 生成 3, 4, 5, 6 (完美避开 y=2)
+                s->cx[k] = (my_rand() % 3) + 3; // 生成 3, 4, 5 (完美避开 x=2)
+                s->cy[k] = (my_rand() % 4) + 3; // 生成 3, 4, 5, 6 (完美避开 y=2)
             }
             // 记录位置用于计算 Boss 房
             rooms_x[count] = rx;
@@ -156,7 +158,11 @@ void init_world_map() {
 
         // 2. 【核心规则】：只有邻居数为 1（死胡同），才有资格成为 Boss 房！
         if (neighbors == 1) {
-            int dist = abs(cx - 6) + abs(cy - 6);
+            int dx = cx - 6;
+            int dy = cy - 6;
+            if (dx < 0) dx = -dx;
+            if (dy < 0) dy = -dy;
+            int dist = dx + dy;
             if (dist > max_dist) {
                 max_dist = dist;
                 boss_index = i;
@@ -170,7 +176,11 @@ void init_world_map() {
     if (boss_index == -1) {
         max_dist = -1;
         for (int i = 1; i < count; i++) {
-            int dist = abs(rooms_x[i] - 6) + abs(rooms_y[i] - 6);
+            int dx = rooms_x[i] - 6;
+            int dy = rooms_y[i] - 6;
+            if (dx < 0) dx = -dx;
+            if (dy < 0) dy = -dy;
+            int dist = dx + dy;
             if (dist > max_dist) {
                 max_dist = dist;
                 boss_index = i;
@@ -186,7 +196,7 @@ void init_world_map() {
     // 6. 随机选一个不是起点也不是 Boss 的房间作为宝箱房
     if (count > 2) {
         int c_idx;
-        do { c_idx = rand() % count; } while (c_idx == 0 || c_idx == boss_index);
+        do { c_idx = my_rand() % count; } while (c_idx == 0 || c_idx == boss_index);
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].type = 'C';
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].is_cleared = 1;
         world_map[rooms_x[c_idx]][rooms_y[c_idx]].seeds.num_clusters = 0;

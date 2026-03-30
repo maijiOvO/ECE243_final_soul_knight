@@ -18,10 +18,16 @@ static unsigned char mouse_packet[3];
 
 void PS2_Init(void) {
     volatile int *mouse_ptr = (int *)PS2_MOUSE_BASE;
-    // 🌟 修改这里：增加一个 while 循环，等待 WSPACE (写空间) 有空余
-    // 只有当高 16 位大于 0 时，才能往里写数据
-    while (((*(mouse_ptr + 1)) & 0xFFFF0000) == 0); 
-    *mouse_ptr = 0xF4; // 告诉鼠标：开始发送数据！
+    int timeout = 100000; // 设置一个超时计数器
+    
+    // 如果一直没有写空间，尝试一段时间后就放弃，防止卡死
+    while (((*(mouse_ptr + 1)) & 0xFFFF0000) == 0 && timeout > 0) {
+        timeout--;
+    }
+    
+    if (timeout > 0) {
+        *mouse_ptr = 0xF4; 
+    }
 }
 
 void PS2_Update(void) {
@@ -65,11 +71,13 @@ void PS2_Update(void) {
             mouse.x += dx;
             // 🌟 修改这里：把 += 改成 -=
             // 因为屏幕的 Y 轴是往下增长的，而物理鼠标往前推 dy 是正数
-            mouse.y -= dy; 
+            mouse.y += dy; 
 
-            // 边界限制保持你的原样就好
-            if (mouse.x < 0) mouse.x = 0; if (mouse.x > 319) mouse.x = 319;
-            if (mouse.y < 0) mouse.y = 0; if (mouse.y > 239) mouse.y = 239;
+            if (mouse.x < 0) { mouse.x = 0; }
+            if (mouse.x > 319) { mouse.x = 319; }
+            
+            if (mouse.y < 0) { mouse.y = 0; }
+            if (mouse.y > 239) { mouse.y = 239; }
         }
     }
 }

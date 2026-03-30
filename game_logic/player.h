@@ -25,6 +25,8 @@ typedef struct Player {
     int is_moving;
 } Player;
 
+extern Player knight_entity;
+
 // 声明对外接口
 void Player_Init(Player *p, int start_x, int start_y);
 void Player_Update(Player *p, int move_dx, int move_dy);

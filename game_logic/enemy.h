@@ -55,5 +55,7 @@ void Draw_All_Enemies();
 void Update_All_Enemies(int player_x, int player_y, int is_j_pressed);
 void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h);
 void Draw_Boss_FX();
+// 通用血条绘制函数声明
+void draw_entity_health_bar(int entity_x, int entity_y, int entity_width, int current_hp, int max_hp);
 
 #endif

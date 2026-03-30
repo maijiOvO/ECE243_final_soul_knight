@@ -1,8 +1,8 @@
 #include "enemy.h"
-
-#include <stdlib.h>
-#include <math.h>           // 🌟 新增：用于计算宝箱怪的距离
+#include "random.h"
 #include "map.h"
+#include "vga.h"
+#include <stddef.h>
 #include "player.h"  // 🌟 新增：让系统认识骑士，为了后面扣血
 #include "../hardware/vga.h"
 #include "../sources/zombie_anim.h" 
@@ -33,7 +33,7 @@ typedef struct {
     BossFXType type;
 } BossFX;
 
-#define MAX_BOSS_FX 50
+#define MAX_BOSS_FX 200
 BossFX boss_fx_list[MAX_BOSS_FX]; 
 
 int boss_timer_tornado = 600; 
@@ -71,8 +71,8 @@ void Enemy_Init_Random(Enemy *e) {
     int attempts = 0;
     
     while (valid_spawn == 0 && attempts < 100) {
-        e->x = (rand() % 8 + 4) * 20; 
-        e->y = (rand() % 5 + 3) * 20;  
+        e->x = (my_rand() % 8 + 4) * 20; 
+        e->y = (my_rand() % 5 + 3) * 20;  
         
         if (can_move_to(e->x, e->y, 20, 20)) {
             valid_spawn = 1; 
@@ -101,14 +101,14 @@ void Enemy_Init_Random(Enemy *e) {
     e->ai_timer = 0;
     e->face_dir = 1; 
 
-    e->type = (rand() % 2 == 0) ? ENEMY_TYPE_ZOMBIE : ENEMY_TYPE_FRANKIE;
+    e->type = (my_rand() % 2 == 0) ? ENEMY_TYPE_ZOMBIE : ENEMY_TYPE_FRANKIE;
 
     if (e->type == ENEMY_TYPE_FRANKIE) {
         e->speed = 1;         
         e->max_hp = 6;        
         e->anim_speed = 25;   
     } else {
-        e->speed = (rand() % 2) + 1; 
+        e->speed = (my_rand() % 2) + 1; 
         e->max_hp = 3;
         e->anim_speed = 8;
     }
@@ -122,8 +122,10 @@ void Enemy_Init_Random(Enemy *e) {
 void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
     if (!e->alive) return;
 
-    int dist_x = abs(e->x - player_x);
-    int dist_y = abs(e->y - player_y);
+    int dx = e->x - player_x;
+    int dy = e->y - player_y;
+    int dist_x = (dx < 0) ? -dx : dx;
+    int dist_y = (dy < 0) ? -dy : dy;
     int distance = dist_x + dist_y; 
 
     // ==========================================
@@ -145,8 +147,8 @@ void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
             case MIMIC_STATE_EVADING:
                 e->ai_timer++;
                 if (e->ai_timer >= 20) { 
-                    e->dir_x = (rand() % 3) - 1; 
-                    e->dir_y = (rand() % 3) - 1;
+                    e->dir_x = (my_rand() % 3) - 1; 
+                    e->dir_y = (my_rand() % 3) - 1;
                     e->ai_timer = 0;
                 }
                 if (distance < 200) { 
@@ -201,10 +203,10 @@ void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
                 Spawn_Boss_FX(e->x, e->y, -3, -3, FX_TYPE_TORNADO, 300, 32, 32); 
                 Spawn_Boss_FX(e->x, e->y, -3, 3,  FX_TYPE_TORNADO, 300, 32, 32); 
             }
-            else if (distance < 150 && (rand() % 100 < 3)) { 
+            else if (distance < 150 && (my_rand() % 100 < 3)) { 
                 e->state = 3; e->current_frame = 0; e->anim_tick = 0; e->dir_x = 0; e->dir_y = 0;
                 int speed_x = 0, speed_y = 0;
-                if (abs(dist_x) > abs(dist_y)) speed_x = (player_x > e->x) ? 6 : -6;
+                if (dist_x > dist_y) speed_x = (player_x > e->x) ? 6 : -6;
                 else speed_y = (player_y > e->y) ? 6 : -6;
                 Spawn_Boss_FX(e->x, e->y, speed_x, speed_y, FX_TYPE_SMEAR, 9999, 32, 32); 
             }
@@ -269,8 +271,8 @@ void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
         if (can_move_to(next_x, e->y, 20, 20)) { 
             e->x = next_x;
         } else {
-            if (rand() % 100 < 40) {
-                int nudge_y = (rand() % 2 == 0) ? 4 : -4; 
+            if (my_rand() % 100 < 40) {
+                int nudge_y = (my_rand() % 2 == 0) ? 4 : -4; 
                 if (can_move_to(e->x, e->y + nudge_y, 20, 20)) e->y += nudge_y;
             }
         }
@@ -279,8 +281,8 @@ void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
         if (can_move_to(e->x, next_y, 20, 20)) {
             e->y = next_y;
         } else {
-            if (rand() % 100 < 40) {
-                int nudge_x = (rand() % 2 == 0) ? 4 : -4;
+            if (my_rand() % 100 < 40) {
+                int nudge_x = (my_rand() % 2 == 0) ? 4 : -4;
                 if (can_move_to(e->x + nudge_x, e->y, 20, 20)) e->x += nudge_x;
             }
         }
@@ -331,12 +333,27 @@ void Enemy_Update(Enemy *e, int player_x, int player_y, int is_j_pressed) {
             }
         } 
         else if (e->type == ENEMY_TYPE_NECRO) {
-            e->current_frame++;
+            e->current_frame++; // 所有状态切帧都先 +1
+            
             if (e->state == 0) e->current_frame %= 8; 
             else if (e->state == 1) e->current_frame %= 8; 
             else if (e->state == 2 && e->current_frame >= 13) { e->state = 0; e->current_frame = 0; } 
             else if (e->state == 3 && e->current_frame >= 13) { e->state = 0; e->current_frame = 0; } 
-            else if (e->state == 4 && e->current_frame >= 17) { e->state = 0; e->current_frame = 0; } 
+            else if (e->state == 4 && e->current_frame >= 17) { e->state = 0; e->current_frame = 0; }
+        
+            else if (e->state == 5) {
+                // ⚠️ 注意：这里的 4 需要替换为你实际受伤动画的帧数！
+                if (e->current_frame >= 4) { 
+                    e->state = 0; // 受伤动作播完，恢复 Idle 状态
+                    e->current_frame = 0; 
+                }
+            }
+            else if (e->state == 6) {
+                // ⚠️ 注意：这里的 12 需要替换为你实际死亡动画的帧数！
+                if (e->current_frame >= 12) { 
+                    e->alive = 0; // 死亡动画播完，彻底从屏幕上消失/移除
+                }
+            }
         }
         else if (e->type == ENEMY_TYPE_GOBLIN_BOMBER && e->state == 1) {
             e->current_frame++; 
@@ -392,14 +409,24 @@ void Enemy_Draw(Enemy *e) {
     }
     // 补齐：亡灵法师图片数据挂载
     else if (e->type == ENEMY_TYPE_NECRO) {
-        const BossFrame *f = NULL;
-        
         if (e->state == 0) { current_image = boss_idle_frames[e->current_frame].data; draw_width = boss_idle_frames[e->current_frame].w; draw_height = boss_idle_frames[e->current_frame].h; }
         else if (e->state == 1) { current_image = boss_walk_frames[e->current_frame].data; draw_width = boss_walk_frames[e->current_frame].w; draw_height = boss_walk_frames[e->current_frame].h; }
         else if (e->state == 2) { current_image = boss_attack_frames[e->current_frame].data; draw_width = boss_attack_frames[e->current_frame].w; draw_height = boss_attack_frames[e->current_frame].h; }
         else if (e->state == 3) { current_image = boss_attack_frames[e->current_frame].data; draw_width = boss_attack_frames[e->current_frame].w; draw_height = boss_attack_frames[e->current_frame].h; }
         else if (e->state == 4) { current_image = boss_ultimate_frames[e->current_frame].data; draw_width = boss_ultimate_frames[e->current_frame].w; draw_height = boss_ultimate_frames[e->current_frame].h; }
-    }
+        
+        // 👇 搬到大括号里面来啦！
+        else if (e->state == 5) { 
+            current_image = boss_hurt_frames[e->current_frame].data; 
+            draw_width = boss_hurt_frames[e->current_frame].w; 
+            draw_height = boss_hurt_frames[e->current_frame].h; 
+        }
+        else if (e->state == 6) { 
+            current_image = boss_death_frames[e->current_frame].data; 
+            draw_width = boss_death_frames[e->current_frame].w; 
+            draw_height = boss_death_frames[e->current_frame].h; 
+        }
+    } // 
     else {
         current_image = zombie_anim[e->current_frame];
     }
@@ -415,34 +442,6 @@ void Enemy_Draw(Enemy *e) {
         Draw_Transparent_Image_horizontal_flip(draw_x, draw_y, current_image, draw_width, draw_height);
     } else {
         Draw_Transparent_Image(draw_x, draw_y, current_image, draw_width, draw_height);
-    }
-
-    if (e->type == ENEMY_TYPE_NECRO && e->alive) {
-        int bar_w = 40;  // 血条的总宽度
-        int bar_h = 4;   // 血条的高度
-        int bar_x = center_x - (bar_w / 2);
-        int bar_y = draw_y - 10; // 画在 Boss 头顶上方 10 像素的位置
-
-        // 防止血量变负数导致画图错乱
-        int hp_to_draw = e->hp;
-        if (hp_to_draw < 0) hp_to_draw = 0;
-
-        // 计算绿色当前血量的长度比例
-        int green_w = (hp_to_draw * bar_w) / e->max_hp;
-
-        // 1. 先画纯红色底色（代表损失的血量）
-        for (int i = 0; i < bar_h; i++) {
-            for (int j = 0; j < bar_w; j++) {
-                plot_pixel(bar_x + j, bar_y + i, 0xF800); 
-            }
-        }
-        
-        // 2. 再画纯绿色前景（代表剩余血量）
-        for (int i = 0; i < bar_h; i++) {
-            for (int j = 0; j < green_w; j++) {
-                plot_pixel(bar_x + j, bar_y + i, 0x07E0); 
-            }
-        }
     }
 }
 
@@ -563,7 +562,21 @@ void Update_All_Enemies(int player_x, int player_y, int is_j_pressed) {
 
 void Draw_All_Enemies() { 
     for (int i = 0; i < num_enemies; i++) {
-        Enemy_Draw(&enemies[i]); 
+        if (enemies[i].alive) {
+            // 1. 无论什么怪物，都先画贴图
+            Enemy_Draw(&enemies[i]); 
+            
+            // 2. 👇 🌟 性能优化：只有在它是 Boss 的情况下，才给它画血条
+            if (enemies[i].type == ENEMY_TYPE_NECRO) {
+                draw_entity_health_bar(
+                    enemies[i].x, 
+                    enemies[i].y, 
+                    enemies[i].width, 
+                    enemies[i].hp,       
+                    enemies[i].max_hp
+                );
+            }
+        }
     }
 }
 
@@ -584,7 +597,19 @@ void Update_Boss_FX(int knight_x, int knight_y, int knight_w, int knight_h) {
                 if (!can_move_to(fx->x, next_y, fx->width, fx->height)) fx->vy = -fx->vy; 
             } else if (fx->type == FX_TYPE_FIRE) { fx->vx = 0; fx->vy = 0; } 
             else if (fx->type == FX_TYPE_SMEAR) { fx->active = 0; continue; }
-        } else { fx->x = next_x; fx->y = next_y; }
+        } else { 
+            fx->x = next_x; 
+            fx->y = next_y; 
+
+            if (fx->type == FX_TYPE_FIRE && (fx->vx != 0 || fx->vy != 0)) {
+                // 火墙移动速度是 3，走 10 帧刚好移动 30 像素（基本等于火墙 32 的宽度）
+                // 所以每 10 帧，就在脚下留下一团【静止】的火
+                if (fx->life_timer % 10 == 0) {
+                    // 速度传 0 和 0，存活时间传 300 帧（5秒 * 60FPS）
+                    Spawn_Boss_FX(fx->x, fx->y, 0, 0, FX_TYPE_FIRE, 300, fx->width, fx->height);
+                }
+            }
+        }
 
         int hit_knight = (fx->x < knight_x + knight_w && fx->x + fx->width > knight_x && fx->y < knight_y + knight_h && fx->y + fx->height > knight_y);
         if (hit_knight) {
@@ -625,4 +650,26 @@ void Draw_Boss_FX() {
             Draw_Transparent_Image(fx->x, fx->y, f->data, fx->width, fx->height);
         }
     }
+}
+
+// 如果 enemy.c 顶部还没包含 vga.h，记得加上，因为要调用 vga_draw_health_bar
+// #include "../hardware/vga.h" 
+
+void draw_entity_health_bar(int entity_x, int entity_y, int entity_width, int current_hp, int max_hp) {
+    int bar_width = 30; // 血条宽度，可以根据需要微调
+    int bar_height = 4; // 血条高度
+    
+    // 计算 X：让血条在实体头顶水平居中
+    int bar_x = entity_x + (entity_width - bar_width) / 2; 
+    
+    // 计算 Y：在实体头顶往上偏移 10 个像素，避免挡住脸
+    int bar_y = entity_y - bar_height - 10; 
+    
+    // 安全卫士：防止实体走到屏幕最顶端时，血条坐标变成负数导致渲染崩溃
+    if (bar_y < 0) {
+        bar_y = 0; 
+    }
+
+    // 调用底层的画图函数
+    vga_draw_health_bar(bar_x, bar_y, current_hp, max_hp, bar_width, bar_height);
 }
