@@ -1,7 +1,6 @@
 #include "enemy.h"
 #include "random.h"
 #include "map.h"
-#include "vga.h"
 #include <stddef.h>
 #include "player.h"  // 🌟 新增：让系统认识骑士，为了后面扣血
 #include "../hardware/vga.h"

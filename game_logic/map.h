@@ -13,6 +13,7 @@
 #define GRID_W 16
 #define GRID_H 12
 #define world_map_max 13
+#include "weapon.h"
 
 typedef struct Player Player;
 
@@ -50,7 +51,9 @@ int can_move_to(int new_x, int new_y, int player_width, int player_height);
 int handle_room_transition(Player *p);
 void apply_doors_to_walls();
 void draw_portals();
-void handle_chest_interaction(Player *p);
+void handle_chest_interaction(Player *p, Weapon *init_weapon);
 void draw_room_objects();
+void handle_room_rewards(Player *knight, Weapon *init_weapon);
+int Handle_Battle_Clear(int alive_count);
 
 #endif

@@ -4,7 +4,10 @@
 #include "../hardware/ps2.h"
 #include "../sources/knight_anim.h"
 #include "../sources/map_texture.h"
+#include "../sources/skill.h"
 #include "player.h"
+#include "weapon.h"
+#include "stdlib.h"
 #define PORTAL_ANIM_SPEED 6
 
 #include "enemy.h"
@@ -23,7 +26,7 @@ int current_room_x = 6;
 int current_room_y = 6;
 
 // 检查玩家是否正在尝试与宝箱交互
-void handle_chest_interaction(Player *p) {
+void handle_chest_interaction(Player *p, Weapon * w) {
     // 1. 只在宝箱房生效
     Room *cur_room = &world_map[current_room_x][current_room_y];
     if (cur_room->type != 'C') return;
@@ -51,11 +54,31 @@ void handle_chest_interaction(Player *p) {
             vga_draw_rect(p->x + (p->width/2) - 1, p->y - 10, 2, 2, Green); // 感叹号的点
 
             // 4. 🌟 检测按键，按下 J 键瞬间开启宝箱
-            if (key_J) {
+                        if (key_J) {
                 cur_room->is_opened = 1;
-                // 可以在这里加入即时反馈，比如满血
-                if((cur_room ->is_mimic) ==  0){
-                    p->current_hp = p->max_hp;
+                if (cur_room->is_mimic == 1) {//mimic
+                    cur_room->is_cleared = 0; 
+                    init_walls(); 
+                    for(int i = 0; i < num_enemies; i++) {
+                        if (enemies[i].alive && enemies[i].type == ENEMY_TYPE_MIMIC) {
+                            enemies[i].state = MIMIC_STATE_TRANSFORMING; // 如果你有变身动画
+                            enemies[i].speed = 1; // 恢复移速，开始追杀玩家
+                        }
+                    }
+                } 
+                else {// real chest
+                    // 洗牌并生成 3 个战利品
+                    int pool[4] = {0, 1, 2, 3}; 
+                    for (int k = 0; k < 4; k++) {
+                        int swap_idx = rand() % 4;
+                        int temp = pool[k];
+                        pool[k] = pool[swap_idx];
+                        pool[swap_idx] = temp;
+                    }
+                    cur_room->spawned_skills[0] = pool[0];
+                    cur_room->spawned_skills[1] = pool[1];
+                    cur_room->spawned_skills[2] = pool[2];
+                    cur_room->skills_picked = 0; 
                 }
             }
         }
@@ -231,9 +254,9 @@ int handle_room_transition(Player *p) { // return 1 if jumped
     int teleported = 0;
 
     // 检测四个边缘
-    if (p->y < -5) {
+    if (p->y < 5) {
         current_room_y--; p->y = 184; teleported = 1;
-    } else if (p->y > 205) {
+    } else if (p->y > 195) {
         current_room_y++; p->y = 30;  teleported = 1;
     } else if (p->x < -5) {
         current_room_x--; p->x = 265; teleported = 1;
@@ -447,6 +470,7 @@ void draw_portals() {
 
 int can_move_to(int new_x, int new_y, int player_width, int player_height) {
 
+
     int x_offset = 2;
     int y_offset = 1;// since the animation does not excactly = 32*32, need the hitbox is smaller
 
@@ -477,4 +501,109 @@ int can_move_to(int new_x, int new_y, int player_width, int player_height) {
     }
 
     return 1; // move when no collision
+}
+
+
+// 1. 专门处理“战斗结束”瞬间的逻辑 (返回 2 代表 Boss 死亡游戏胜利)
+int Handle_Battle_Clear(int alive_count) {
+    Room *cur_room = &world_map[current_room_x][current_room_y];
+    
+    // 只有在未清空，且怪物死光的瞬间才触发
+    if (cur_room->is_cleared == 0 && alive_count == 0) {
+        cur_room->is_cleared = 1; // 标记房间已清空
+        
+        // --- 胜利特判 ---
+        if (cur_room->type == 'B') {
+            return 2; // 返回 2 告诉 main 函数游戏通关了！
+        }
+
+        // --- 核心优化：铲平场地 ---
+        // 把内部掩体数量设为 0，然后重新生成地形。
+        // 这不仅扫清了场地防止卡奖励，同时内部也会调用 apply_doors_to_walls 瞬间打开大门！
+        cur_room->seeds.num_clusters = 0;
+        init_walls(); 
+
+        // --- 生成怪物房的三选一奖励 ---
+        if (cur_room->type == 'M'|| (cur_room->type == 'C' && cur_room->is_mimic == 1)) {
+            int pool[4] = {0, 1, 2, 3}; // 0移速, 1回血, 2伤害, 3射速
+            for (int k = 0; k < 4; k++) {
+                int swap_idx = rand() % 4; // 这里用你自己的 rand()
+                int temp = pool[k];
+                pool[k] = pool[swap_idx];
+                pool[swap_idx] = temp;
+            }
+            cur_room->spawned_skills[0] = pool[0];
+            cur_room->spawned_skills[1] = pool[1];
+            cur_room->spawned_skills[2] = pool[2];
+            cur_room->skills_picked = 0; // 标记为未拾取
+        }
+        return 1; // 房间刚被清空
+    }
+    return 0; // 还没打完，或者早就清空了
+}
+
+// 2. 专门处理“渲染战利品”与“玩家拾取”
+void handle_room_rewards(Player *knight, Weapon *init_weapon) {
+    Room *cur_room = &world_map[current_room_x][current_room_y];
+    
+    // 判断是否应该显示奖励：怪物房已清空，或宝箱房已开启
+    bool show_rewards = false;
+    
+    if (cur_room->type == 'M' || cur_room->type == 'B') {
+        // 普通怪 / Boss 房：打完了就给奖励
+        if (cur_room->is_cleared) {
+            show_rewards = true;
+        }
+    } 
+    else if (cur_room->type == 'C') {
+        if (cur_room->is_mimic) {
+
+            if (cur_room->is_opened && cur_room->is_cleared) {//mimic
+                show_rewards = true;
+            }
+        } else {// real chest
+            if (cur_room->is_opened) {
+                show_rewards = true;
+            }
+        }
+    }
+
+    if (show_rewards && cur_room->skills_picked == 0) {
+        int pos_x[3] = {100, 144, 188}; 
+        int pos_y = 160; 
+        bool prompt_drawn = false; // 【新增】：标记这一帧是否已经画过交互提示了
+
+        for (int i = 0; i < 3; i++) {
+            int skill_id = cur_room->spawned_skills[i];
+            
+            // 1. 绝对无脑地画出所有技能图标 (图必须画完！)
+            Draw_Transparent_Image(pos_x[i], pos_y, skill_anim[skill_id], 32, 32);
+
+            // 2. 玩家靠近判定 (AABB 碰撞)
+            // 如果还没画过提示，且玩家碰到了这个图标
+            if (!prompt_drawn && 
+                knight->x < pos_x[i] + 32 && knight->x + knight->width > pos_x[i] &&
+                knight->y < pos_y + 32 && knight->y + knight->height > pos_y) {
+                
+                // 画出绿色 F 键提示
+                vga_draw_rect(pos_x[i] + 14, pos_y - 10, 4, 4, Green);
+                prompt_drawn = true; // 标记已画，防止一次踩俩
+                
+                // 按 F 键拾取
+                if (key_J) {
+                    if (skill_id == 0) knight->speed += 1; 
+                    else if (skill_id == 1) knight->current_hp = knight->max_hp; 
+                    else if (skill_id == 2) init_weapon->damage += 2; 
+                    else if (skill_id == 3) {
+                        init_weapon->fire_rate -= 2; 
+                        if (init_weapon->fire_rate < 2) init_weapon->fire_rate = 2; 
+                    }
+                    
+                    cur_room->skills_picked = 1; 
+                    // 【注意】：这里把原来的 break 删掉了！
+                    // 因为一旦 skills_picked 变成 1，下一帧根本进不来这个大函数了，不需要 break
+                }
+            }
+        }
+    }
 }
