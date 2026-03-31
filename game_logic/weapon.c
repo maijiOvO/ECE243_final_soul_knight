@@ -5,6 +5,7 @@
 #include "../hardware/ps2.h"
 #include "../sources/weapon_texture.h"
 #include "player.h"
+#include "../hardware/audio.h"
 
 //  quick sqrt
 uint32_t isqrt(uint32_t n) {
@@ -21,40 +22,54 @@ uint32_t isqrt(uint32_t n) {
 }
 
 static int get_dir_index_16(int dx, int dy) {
+    if (dx == 0 && dy == 0) return 0;
+
+    // 💥【核心修复 1】：抵消 VGA 屏幕 Y 轴向下的物理特性
+    // 把它翻转回标准的数学坐标系 (向上为正)
+    dy = -dy; 
+
     int adx = (dx < 0) ? -dx : dx;
     int ady = (dy < 0) ? -dy : dy;
 
-    if (adx == 0 && ady == 0) return 0;
+    int index = 0;
 
-    // 用斜率近似分成每个象限 4 段，共 16 方向
-    // 比例阈值大致对应 22.5° 和 67.5°
-    int t1 = adx * 2;
-    int t2 = ady * 5;
+    // 💥【核心修复 2】：使用精确的定点数比例分割 16 个扇区
+    // tan(11.25°) ≈ 0.2  => ady * 5 <= adx
+    // tan(33.75°) ≈ 0.67 => ady * 3 <= adx * 2
+    // tan(56.25°) ≈ 1.5  => ady * 2 <= adx * 3
+    // tan(78.75°) ≈ 5.0  => ady     <= adx * 5
 
-    if (dx >= 0 && dy <= 0) { // 右上象限
-        if (t2 <= adx) return 0;       // 右
-        if (ady <= adx) return 1;      // 右上偏右
-        if (t1 <= ady) return 3;       // 上
-        return 2;                      // 右上偏上
+    if (ady * 5 <= adx) {
+        // [接近水平]：正右 (0) 或 正左 (8)
+        index = (dx >= 0) ? 0 : 8;
+    } 
+    else if (ady * 3 <= adx * 2) {
+        // [水平偏斜 22.5°]
+        if (dx >= 0 && dy >= 0) index = 15;      // 右上偏右
+        else if (dx < 0 && dy >= 0) index = 9;   // 左上偏左
+        else if (dx < 0 && dy < 0) index = 7;    // 左下偏左
+        else index = 1;                          // 右下偏右
+    } 
+    else if (ady * 2 <= adx * 3) {
+        // [标准对角线 45°]
+        if (dx >= 0 && dy >= 0) index = 14;      // 右上
+        else if (dx < 0 && dy >= 0) index = 10;  // 左上
+        else if (dx < 0 && dy < 0) index = 6;    // 左下
+        else index = 2;                          // 右下
+    } 
+    else if (ady <= adx * 5) {
+        // [垂直偏斜 67.5°]
+        if (dx >= 0 && dy >= 0) index = 13;      // 右上偏上
+        else if (dx < 0 && dy >= 0) index = 11;  // 左上偏上
+        else if (dx < 0 && dy < 0) index = 5;    // 左下偏下
+        else index = 3;                          // 右下偏下
+    } 
+    else {
+        // [接近垂直]：正上 (12) 或 正下 (4)
+        index = (dy >= 0) ? 12 : 4;
     }
-    else if (dx < 0 && dy <= 0) { // 左上象限
-        if (t2 <= adx) return 8;       // 左
-        if (ady <= adx) return 7;      // 左上偏左
-        if (t1 <= ady) return 5;       // 上
-        return 6;                      // 左上偏上
-    }
-    else if (dx < 0 && dy > 0) { // 左下象限
-        if (t2 <= adx) return 8;       // 左
-        if (ady <= adx) return 9;      // 左下偏左
-        if (t1 <= ady) return 11;      // 下
-        return 10;                     // 左下偏下
-    }
-    else { // dx >= 0 && dy > 0, 右下象限
-        if (t2 <= adx) return 0;       // 右
-        if (ady <= adx) return 15;     // 右下偏右
-        if (t1 <= ady) return 13;      // 下
-        return 14;                     // 右下偏下
-    }
+
+    return index;
 }
 
 void Bullet_Erase(Weapon *w, int buffer_id) {
@@ -101,6 +116,8 @@ void Weapon_Update(Weapon *w, Player *p, MouseState *m, Enemy *enemies, int enem
                 // 初始位置设定 (玩家中心)
                 w->bullets[i].x_fp = (p->x + 16) << FP_SHIFT;
                 w->bullets[i].y_fp = (p->y + 16) << FP_SHIFT;
+
+                Play_Shoot_SFX();
                 
                 w->cooldown_timer = w->fire_rate;
                 break;

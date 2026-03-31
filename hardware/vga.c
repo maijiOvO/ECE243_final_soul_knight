@@ -1,5 +1,6 @@
 #include"vga.h"
 #include"address_map.h"
+#include"audio.h"
 
 
 
@@ -171,7 +172,9 @@ void vga_wait_for_vsync(){
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020; // Buffer Register
     volatile int * pixel_status_ptr = (int *)0xFF20302C; // Status Register
     *pixel_ctrl_ptr = 1;
-    while (*pixel_status_ptr & 0x01);
+    while (*pixel_status_ptr & 0x01){
+        Audio_Update(); 
+    };
 }
 
 void vga_draw_rect(int x, int y, int width, int height, short color){

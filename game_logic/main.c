@@ -9,7 +9,8 @@
 #include "../sources/map_texture.h"
 #include "../sources/status_screen.h"
 #include "enemy.h"
-#include "../sources/skill.h"  // 🌟 新增：让 main 认识你的技能图标
+#include "../sources/skill.h"
+#include "../hardware/audio.h"
 
 #define COLOR_MAGENTA_565  0xF81F 
 
@@ -72,6 +73,7 @@ int main(void) {
     while(1) {
         // [A] 读取输入
         PS2_Update();
+        Audio_Update();
 
         int dx = 0, dy = 0;
         if (key_W) dy -= 1;
@@ -82,9 +84,11 @@ int main(void) {
         // [B] 逻辑更新
         Player_Update(knight, dx, dy);
         Weapon_Update(init_weapon, knight, &mouse, enemies, num_enemies);
+        Audio_Update();
 
         // 把 0 换成真实的键盘状态 key_J
-        Update_All_Enemies(knight->x, knight->y, key_J);     
+        Update_All_Enemies(knight->x, knight->y, key_J);   
+         Audio_Update();  
         
         // game over logics
         if (knight->current_hp <= 0) {
@@ -104,6 +108,7 @@ int main(void) {
         }
 
         Draw_Opaque_Image(0, 0, dungeon, 320, 240);
+         Audio_Update();
 
         int alive_count = 0;
         for (int i = 0; i < num_enemies; i++) {
@@ -124,10 +129,12 @@ int main(void) {
         draw_walls();
         draw_portals();
         draw_world_map();
+         Audio_Update();
 
         handle_chest_interaction(knight, init_weapon);
         handle_room_rewards(knight, init_weapon);
         draw_room_objects();
+         Audio_Update();
 
         
         Room *cur_room = &world_map[current_room_x][current_room_y];
@@ -139,11 +146,13 @@ int main(void) {
         Player_Draw(knight);
         Weapon_Draw(init_weapon, knight);
         Bullet_Draw(init_weapon, current_buffer);
+         Audio_Update();
 
         Draw_All_Enemies();
 
         Update_Boss_FX(knight->x, knight->y, knight->width, knight->height); 
         Draw_Boss_FX();
+         Audio_Update();
 
         // 绘制准星 (绿色十字)
         vga_draw_rect(mouse.x, mouse.y + 2, 5, 1, Green);
