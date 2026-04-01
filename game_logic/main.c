@@ -26,6 +26,26 @@ int prev_mouse_y[2] = {120, 120};
 Player knight_entity;
 Weapon gun_entity;
 
+int find_nearest_enemy(Player* p) {
+    int nearest_idx = -1;
+    int min_dist_sq = 1000000; // 设定一个很大的初始距离平方
+
+    for (int i = 0; i < num_enemies; i++) {
+        if (enemies[i].alive) {
+            // 计算玩家到敌人的距离平方 (dx^2 + dy^2)
+            int dx = enemies[i].x - p->x;
+            int dy = enemies[i].y - p->y;
+            int dist_sq = dx*dx + dy*dy;
+
+            if (dist_sq < min_dist_sq) {
+                min_dist_sq = dist_sq;
+                nearest_idx = i;
+            }
+        }
+    }
+    return nearest_idx;
+}
+
 int main(void) {
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 
@@ -82,10 +102,31 @@ int main(void) {
         if (key_D) dx += 1;
 
         // [B] 逻辑更新
+        // [B] 逻辑更新
         Player_Update(knight, dx, dy);
+
+        // --- 新增：自动瞄准逻辑 (接管鼠标) ---
+        int target_idx = find_nearest_enemy(knight);
+        if (target_idx != -1) {
+            // 锁定最近的敌人，把"伪鼠标"的坐标移到敌人身上
+            // 假设敌人长宽大约是 20x20，加 10 让准星瞄准敌人中心
+            mouse.x = enemies[target_idx].x + 10; 
+            mouse.y = enemies[target_idx].y + 10;
+        } else {
+            // 如果房间没敌人了，准星收回玩家身上
+            mouse.x = knight->x + 10;
+            mouse.y = knight->y + 10;
+        }
+        
+        // 【核心魔法】将键盘 J 键的状态，强行赋值给鼠标左键！
+        // 这样 Weapon_Update 就会以为玩家按下了鼠标左键并开火
+        mouse.left_click = key_J; 
+        // ------------------------------------
+
+        // 现在武器更新函数会自动朝锁定的目标射击了
         Weapon_Update(init_weapon, knight, &mouse, enemies, num_enemies);
         Audio_Update();
-
+        
         // 把 0 换成真实的键盘状态 key_J
         Update_All_Enemies(knight->x, knight->y, key_J);   
          Audio_Update();  

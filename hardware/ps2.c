@@ -18,16 +18,15 @@ static unsigned char mouse_packet[3];
 
 void PS2_Init(void) {
     volatile int *mouse_ptr = (int *)PS2_MOUSE_BASE;
-    int timeout = 100000; // 设置一个超时计数器
     
-    // 如果一直没有写空间，尝试一段时间后就放弃，防止卡死
-    while (((*(mouse_ptr + 1)) & 0xFFFF0000) == 0 && timeout > 0) {
-        timeout--;
-    }
+    // 1. 简单的软件延时，等待鼠标硬件上电准备就绪 (约几百毫秒)
+    for(volatile int i = 0; i < 1000000; i++); 
     
-    if (timeout > 0) {
-        *mouse_ptr = 0xF4; 
-    }
+    // 2. 强制发送 0xF4 给鼠标通道，不需要用 while 检查保留位
+    *mouse_ptr = 0xF4; 
+    
+    // 3. 再给一点时间让鼠标响应这个命令
+    for(volatile int i = 0; i < 500000; i++); 
 }
 
 void PS2_Update(void) {
@@ -46,38 +45,6 @@ void PS2_Update(void) {
             if (b == 0x23) key_D = state;
             if (b == 0x3B) key_J = state;
             kbd_break = 0;
-        }
-    }
-
-    // --- 2. 处理鼠标 (Port 1) ---
-    volatile int *mouse_ptr = (int *)PS2_MOUSE_BASE;
-    while (1) {
-        int data = *mouse_ptr;
-        if (!(data & 0x8000)) break;
-        unsigned char b = data & 0xFF;
-
-        // 同步判断：第一包的 Bit 3 必须为 1
-        if (mouse_phase == 0 && !(b & 0x08)) continue;
-
-        mouse_packet[mouse_phase++] = b;
-
-        if (mouse_phase == 3) {
-            mouse_phase = 0;
-            mouse.left_click = mouse_packet[0] & 0x01;
-            
-            signed char dx = (signed char)mouse_packet[1];
-            signed char dy = (signed char)mouse_packet[2];
-            
-            mouse.x += dx;
-            // 🌟 修改这里：把 += 改成 -=
-            // 因为屏幕的 Y 轴是往下增长的，而物理鼠标往前推 dy 是正数
-            mouse.y += dy; 
-
-            if (mouse.x < 0) { mouse.x = 0; }
-            if (mouse.x > 319) { mouse.x = 319; }
-            
-            if (mouse.y < 0) { mouse.y = 0; }
-            if (mouse.y > 239) { mouse.y = 239; }
         }
     }
 }
